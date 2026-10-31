@@ -46,7 +46,7 @@ footer{position:absolute;bottom:0;left:0;right:0;padding:12px 24px;display:flex;
 #play{display:block;width:320px;text-align:left;background:#6d3fd1;border:0;padding:18px;font-size:15px;letter-spacing:3px}#play:hover:not(:disabled){background:#8452ee}#play span{float:right}
 .ghost{display:block;width:320px;margin-top:10px;text-align:left;background:transparent}
 #notice{display:block;margin-top:16px;font:10px Arial,sans-serif;color:#8a8098}
-@media(max-width:760px){h1{font-size:60px}.menu{margin:0 16px}#play,.ghost{width:100%}#quest{display:none}.columns{grid-template-columns:1fr}footer{font-size:9px;padding:8px 16px}#hud{left:16px}}
+@media(max-width:760px){#overlay{background:linear-gradient(180deg,#0c0910f0 0%,#0c0910d8 70%,#0c091099 100%)}h1{font-size:60px}.menu{margin:0 16px}#play,.ghost{width:100%}#quest{display:none}.columns{grid-template-columns:1fr}footer{font-size:9px;padding:8px 16px}#hud{left:16px}}
 
 .mp{background:#6d5ad8}.level small{font-size:7px;letter-spacing:1px;text-align:center}
 #compassStrip span.home{color:#b98cff;font-size:14px;top:4px}
@@ -117,7 +117,11 @@ footer{position:absolute;bottom:0;left:0;right:0;padding:12px 24px;display:flex;
 #tip{position:fixed;z-index:50;max-width:300px;padding:8px 11px;background:#1a1226f5;border:1px solid #9a6bff66;box-shadow:0 8px 24px #0009;font:12px/1.5 Arial,sans-serif;color:#e8deff;pointer-events:none;opacity:0;transition:opacity .12s}
 #tip.on{opacity:1}#tip b{color:var(--gold);font-weight:normal}#tip small{color:var(--dim)}
 #help{z-index:30}
-#spells{z-index:25;pointer-events:auto}#pack,#map{z-index:28}
+#spells{z-index:25;pointer-events:auto}#pack,#map{z-index:28}#hud .row{pointer-events:auto}
+#touchNote{display:none;margin-top:16px;font:11px Arial,sans-serif;color:var(--gold)}
+@media(hover:none) and (pointer:coarse){#touchNote{display:block}}
+@media(max-width:760px){footer{display:none}#spells{bottom:12px}#hud{bottom:184px}}
+body.fresh :is(#compass,#region,#clock,#coven,#quest,#hud,#spells,#prompt,#crosshair),body.fresh footer,body.menu footer,body.menu #hud{visibility:hidden}
 
 #helpBody section.spells{column-span:all}#helpBody section.spells p{margin:10px 0 2px;color:#e8deff}#helpBody section.spells b{color:var(--gold);font-weight:normal}#helpBody section.spells small{color:var(--dim)}
 #quit{margin-top:8px}

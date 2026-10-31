@@ -49,7 +49,7 @@ function saveState() { if (state) try { localStorage.setItem(SAVE_KEY, JSON.stri
 
 const net = new Net();
 let remotes = new Map(), villages = new Map(), serverBoss = null, netTimer = 0, lastSent = '', heartbeat = 0;
-let state = null, explored, creatures = [], allies = [], projectiles = [], boss = null, keys = new Set(), mode = 'menu';
+let state = null, explored, creatures = [], allies = [], projectiles = [], boss = null, keys = new Set(), jumpTap = false, mode = 'menu';
 let yaw = 0, pitch = .3, swing = 0, swingCooldown = 0, last = 0, accumulator = 0, saveTimer = 0, spawnTimer = 0, moving = false, hurtFlash = 0, mapBase = null, tab = 'items', nextId = 1;
 
 function begin(s) {
@@ -519,7 +519,8 @@ function updatePlayer(dt) {
       p.y = g; p.vy = 0; p.grounded = true;
     } else if (p.y > g + .3) p.grounded = false;
   }
-  if (keys.has('Space') && p.grounded && !p.mounted && p.stamina > 8 && p.hp > 0) { p.vy = 7.5; p.grounded = false; p.stamina -= 8; }
+  const jump = keys.has('Space') || jumpTap; jumpTap = false;
+  if (jump && p.grounded && !p.mounted && p.stamina > 8 && p.hp > 0) { p.vy = 7.5; p.grounded = false; p.stamina -= 8; }
 
   const surface = world.surface(p.x, p.z), cold = (surface === 'snow' || surface === 'peaks' && isNight()) && !nearFire(10);
   if (cold && !p.cold && !R.warm(p)) toast('The cold bites. Find a fire or craft a Hide Cloak.');
@@ -986,7 +987,7 @@ net.on('status', (status) => {
 
 function openChat() {
   if (!net.online) { toast('Chat needs an online world. Turn on “Play online” in the menu.'); return; }
-  mode = 'chat'; keys.clear();
+  mode = 'chat'; keys.clear(); jumpTap = false;
   $('#chatInput').classList.remove('hidden'); $('#chatInput').value = ''; $('#chatInput').focus();
 }
 $('#chatInput').addEventListener('keydown', e => {
@@ -997,15 +998,15 @@ $('#chatInput').addEventListener('keydown', e => {
 
 // ---------- modes & input ----------
 function captureMouse() { try { canvas.requestPointerLock?.()?.catch?.(() => {}); } catch { /* arrow keys still turn */ } }
-function play() { music.start(); goOnline(); mode = 'playing'; accumulator = 0; keys.clear(); for (const id of ['#overlay', '#pack', '#map', '#classes', '#help']) $(id).classList.add('hidden'); captureMouse(); }
+function play() { music.start(); goOnline(); mode = 'playing'; accumulator = 0; keys.clear(); jumpTap = false; for (const id of ['#overlay', '#pack', '#map', '#classes', '#help']) $(id).classList.add('hidden'); captureMouse(); }
 function openPanel(name, withTab) {
-  mode = name; keys.clear(); document.exitPointerLock?.();
+  mode = name; keys.clear(); jumpTap = false; document.exitPointerLock?.();
   $(`#${name}`).classList.remove('hidden');
   if (withTab) tab = withTab;
   if (name === 'pack') renderPack(); else if (name === 'help') renderHelp(); else renderMap();
 }
 function pause() {
-  mode = 'paused'; keys.clear(); document.exitPointerLock?.(); saveState();
+  mode = 'paused'; keys.clear(); jumpTap = false; document.exitPointerLock?.(); saveState();
   $('#overlay').classList.remove('hidden'); $('#play').innerHTML = 'RESUME <span>→</span>'; $('#quit').classList.remove('hidden');
   $('#description').textContent = `${CLASSES[state.player.class].name}, level ${state.player.level}, day ${state.day}. Your progress is saved.`;
 }
@@ -1041,6 +1042,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyN' && mode === 'playing') { setMusic(!music.enabled); toast(music.enabled ? 'Music on.' : 'Music off.'); return; }
   if (mode !== 'playing') return;
   keys.add(e.code);
+  if (e.code === 'Space') jumpTap = true; // kept until the next step, so a quick tap on a slow frame still jumps
   const spell = SPELL_KEYS.indexOf(e.code);
   if (spell >= 0) cast(spell);
   if (e.code === 'KeyE') interaction()?.act();
@@ -1143,16 +1145,19 @@ $('#helpBtn').onclick = () => { renderHelp(); $('#help').classList.remove('hidde
 function closeMenuHelp() { $('#help').classList.add('hidden'); mode = state && $('#overlay').classList.contains('hidden') ? 'playing' : state ? 'paused' : 'menu'; }
 document.querySelector('#help [data-close]').onclick = () => (mode === 'help-menu' ? closeMenuHelp() : play());
 
+// Without a save, play starts at class selection, and the menu shows a witch on a ridge at dusk,
+// watching the beacon over the Crown.
+const TITLE_VIEW = { x: -517, z: -188, dayTime: .73, turn: -.4, pitch: -.15 };
+const preview = freshState('wild');
+Object.assign(preview.player, { x: TITLE_VIEW.x, z: TITLE_VIEW.z, y: world.ground(TITLE_VIEW.x, TITLE_VIEW.z), yaw: Math.atan2(CROWN.z - TITLE_VIEW.z, CROWN.x - TITLE_VIEW.x) });
 const saved = loadState();
 if (saved) { begin(saved); $('#play').innerHTML = 'CONTINUE <span>→</span>'; $('#newGame').classList.remove('hidden'); }
-else begin(freshState('wild'));
+else begin(preview);
 window.__coven = { net, get remotes() { return remotes; }, get villages() { return villages; }, get state() { return state; }, world, view, get creatures() { return creatures; }, get allies() { return allies; }, get boss() { return boss; }, cast, placeBuilding, get mode() { return mode; }, spawn: (kind, x, z) => creatures.push(newCreature(kind, x, z)), loot: { generateGear, addGear }, equip: id => R.equip(state.player, id), get portrait() { return portrait; }, aim: (y, p) => { yaw = y; pitch = p; }, hit: (c, n) => damage(c, n), humanVillages, villageState, interact: () => interaction()?.act(),
   // For the playthrough bot (Scripts/playthrough.mjs): run the game for `seconds` without drawing it, and read what it said.
   step: seconds => { for (let i = 0; i < seconds * 60 && mode === 'playing'; i++) { update(1 / 60); if (i % 15 === 0) view.stream(state.player.x, state.player.z, 2); } },
   messages };
-// Without a save, the menu shows the world behind it but play starts at class selection.
 if (!saved) state = null;
-const preview = freshState('wild');
 
 // Auto graphics: lower the render resolution when frames run slow, raise it again when there is headroom.
 const GFX_KEY = 'coven-gfx';
@@ -1185,7 +1190,9 @@ function frame(now) {
   autoScale(raw, dt);
   if (mode === 'playing') { accumulator += dt; while (accumulator >= 1 / 60) { update(1 / 60); accumulator -= 1 / 60; } }
   const s = state ?? preview, p = s.player;
-  if (!state) yaw += dt * .05;
+  if (!state) yaw = p.yaw + TITLE_VIEW.turn + Math.sin(now / 9000) * .06; // a slow drift
+  // Before there is a game the HUD has nothing to show; the controls bar gives way to the menu.
+  put('body', 'className', [state ? '' : 'fresh', $('#overlay').classList.contains('hidden') ? '' : 'menu'].join(' ').trim());
   view.stream(p.x, p.z, mode === 'playing' ? 1 : 4);
   if (state) {
     const k = Math.min(1, dt * 10);
@@ -1199,7 +1206,7 @@ function frame(now) {
     put('#hurt', 'className', hurtFlash > 0 ? 'on' : '');
     if (mode === 'pack' && tab === 'items') { portrait ??= new HeroPreview($('#heroCanvas')); portrait.show(p.class, lookOf(p), now / 1000, dt); }
     if ((hudTimer -= dt) <= 0) { hudTimer = .1; hud(); musicMood(); }
-  } else view.render({ player: p, yaw, pitch: .25, dayTime: .3, now: now / 1000, dt, swing: 0, toolName: 'fists', lights: hearthFires(), moving: false, sight: false });
+  } else view.render({ player: p, yaw, pitch: TITLE_VIEW.pitch, dayTime: TITLE_VIEW.dayTime, now: now / 1000, dt, swing: 0, toolName: 'fists', lights: hearthFires(), moving: false, sight: false });
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
