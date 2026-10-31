@@ -163,11 +163,13 @@ try{
   await page.keyboard.press('KeyH');await page.waitForTimeout(300);
   check('H closes it back to play',await page.locator('#help').isHidden()&&await page.evaluate(()=>__coven.mode)==='playing');
   // Interact with the elder, broom.
-  await page.evaluate(()=>{const C=__coven,p=C.state.player,h=C.world.hearthOf(C.world.region(p.x,p.z));p.x=h.x+3-1.5;p.z=h.z+3;p.y=C.world.ground(p.x,p.z);});
-  await page.waitForTimeout(500);
-  const prompt=await page.locator('#prompt').textContent();
-  await page.keyboard.press('KeyE');await page.waitForTimeout(500);
-  check('E talks to the elder',/Elder|elder|Speak|Return/.test(prompt)&&await page.evaluate(()=>__coven.messages.length>0),prompt.trim().slice(0,60));
+  // Beside her own elder, who stands 3 m off her hearth.
+  await page.evaluate(()=>{const C=__coven,p=C.state.player,h=C.world.hearthOf({bog:'swamp',hex:'darkforest',bloom:'meadow',wild:'forest'}[p.class]);p.x=h.x+3-1.5;p.z=h.z+3;p.y=C.world.ground(p.x,p.z);C.aim(0,.2);});
+  const prompted=await page.waitForFunction(()=>/Speak with/.test(document.querySelector('#prompt').textContent),null,{timeout:5000}).then(()=>true,()=>false);
+  const prompt=await page.locator('#prompt').textContent(),said=await page.evaluate(()=>__coven.messages.length);
+  await page.keyboard.press('KeyE');
+  const spoke=await page.waitForFunction(n=>__coven.messages.length>n,said,{timeout:3000}).then(()=>true,()=>false);
+  check('E talks to the elder',prompted&&spoke,`prompt "${prompt.trim().slice(0,60)}"`);
   await page.evaluate(()=>{__coven.state.player.inv.broom=1;__coven.equip('broom');});
   await page.keyboard.press('KeyF');await page.waitForTimeout(300);
   check('F mounts the broom',await page.evaluate(()=>!!__coven.state.player.mounted));
