@@ -16,7 +16,10 @@ await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const url=`http://127.0.0.1:${server.address().port}/`;
 const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{}),args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader','--autoplay-policy=no-user-gesture-required']});
 const results=[];
-const check=(name,ok,detail='')=>{results.push({name,ok:!!ok,detail});console.log(`${ok?'✓':'✗'} ${name}${detail?` — ${detail}`:''}`);};
+// A failed check also records the page's recent focus and mouse-lock events and modes, to show why.
+let current=null;
+const check=(name,ok,detail='')=>{const r={name,ok:!!ok,detail};results.push(r);console.log(`${ok?'✓':'✗'} ${name}${detail?` — ${detail}`:''}`);
+ if(!ok&&current)r.events=current.evaluate(()=>window.__events?.slice(-8)??[]).catch(()=>[]);};
 async function open(quality,{viewport={width:1280,height:800},music=false,keep,phone=false}={}){
  const ctx=keep??await browser.newContext({viewport,...(phone?{isMobile:true,hasTouch:true}:{})});
  const page=await ctx.newPage();page.setDefaultTimeout(90000);
@@ -24,8 +27,13 @@ async function open(quality,{viewport={width:1280,height:800},music=false,keep,p
  page.on('dialog',d=>d.accept());
  await page.addInitScript(([q,mu])=>{try{if(!sessionStorage.getItem('seeded')){sessionStorage.setItem('seeded','1');localStorage.setItem('coven-gfx',q);localStorage.setItem('coven-music',mu?'{"on":true,"volume":0.5}':'0');}}catch{}
   // Watch the audio contexts the game makes.
+  window.__events=[];const log=t=>window.__events.push(`${Math.round(performance.now())}ms ${t} (mode ${window.__coven?.mode}, mouse ${document.pointerLockElement?'held':'free'})`);
+  document.addEventListener('pointerlockchange',()=>log('pointerlockchange'));document.addEventListener('pointerlockerror',()=>log('pointerlockerror'));
+  addEventListener('blur',()=>log('blur'));addEventListener('focus',()=>log('focus'));document.addEventListener('visibilitychange',()=>log(`visibility ${document.visibilityState}`));
+  addEventListener('keydown',e=>{if(['Escape','Tab','KeyM','KeyH'].includes(e.code))log(`key ${e.code}`);},true);
   const AC=window.__AC=window.AudioContext;window.__audio=[];window.AudioContext=class extends AC{constructor(...a){super(...a);window.__audio.push(this);}};},[quality,music]);
  await page.goto(url);await page.waitForFunction(()=>!!window.__coven);
+ current=page;
  return {page,errs,ctx};
 }
 const fps=page=>page.evaluate(()=>new Promise(r=>{let n=0;const t0=performance.now();const f=()=>{n++;if(performance.now()-t0<4000)requestAnimationFrame(f);else r(n/((performance.now()-t0)/1000));};requestAnimationFrame(f);}));
@@ -230,7 +238,8 @@ try{
 }finally{
  const bad=results.filter(r=>!r.ok);
  console.log(`\n${results.length-bad.length}/${results.length} checks passed`);
- if(bad.length)console.log('FAILED:\n'+bad.map(r=>`  ${r.name} ${r.detail}`).join('\n'));
+ for(const r of bad)r.events=await r.events;
+ if(bad.length)console.log('FAILED:\n'+bad.map(r=>`  ${r.name} ${r.detail}${r.events?.length?`\n    events: ${r.events.join(' | ')}`:''}`).join('\n'));
  else if(results.length)console.log('PASS: everything a player touches works: graphics levels, title, help and spell list, music, movement, gathering, casting, panels, tabs, tooltips, map, broom, pause, falling, resizing, beacon, quit and continue, new game, phone screen.');
  process.exitCode=bad.length||!results.length?1:0;
  await browser.close();server.close();

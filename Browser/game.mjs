@@ -998,15 +998,19 @@ $('#chatInput').addEventListener('keydown', e => {
 
 // ---------- modes & input ----------
 function captureMouse() { try { canvas.requestPointerLock?.()?.catch?.(() => {}); } catch { /* arrow keys still turn */ } }
+// Letting the mouse go for a panel or the pause menu. The browser reports it a moment later, perhaps after the
+// panel has already closed again, so that report must not be taken for the player leaving the game.
+let releasing = false;
+function releaseMouse() { if (document.pointerLockElement === canvas) { releasing = true; document.exitPointerLock?.(); } }
 function play() { music.start(); goOnline(); mode = 'playing'; accumulator = 0; keys.clear(); jumpTap = false; for (const id of ['#overlay', '#pack', '#map', '#classes', '#help']) $(id).classList.add('hidden'); captureMouse(); }
 function openPanel(name, withTab) {
-  mode = name; keys.clear(); jumpTap = false; document.exitPointerLock?.();
+  mode = name; keys.clear(); jumpTap = false; releaseMouse();
   $(`#${name}`).classList.remove('hidden');
   if (withTab) tab = withTab;
   if (name === 'pack') renderPack(); else if (name === 'help') renderHelp(); else renderMap();
 }
 function pause() {
-  mode = 'paused'; keys.clear(); jumpTap = false; document.exitPointerLock?.(); saveState();
+  mode = 'paused'; keys.clear(); jumpTap = false; releaseMouse(); saveState();
   $('#overlay').classList.remove('hidden'); $('#play').innerHTML = 'RESUME <span>→</span>'; $('#quit').classList.remove('hidden');
   $('#description').textContent = `${CLASSES[state.player.class].name}, level ${state.player.level}, day ${state.day}. Your progress is saved.`;
 }
@@ -1026,7 +1030,11 @@ addEventListener('blur', () => { if (mode === 'playing') pause(); });
 addEventListener('beforeunload', saveState);
 // A host closing the tab ends the game for everyone at once, rather than leaving guests waiting.
 addEventListener('pagehide', () => { if (net.mode === 'host') net.close(); });
-document.addEventListener('pointerlockchange', () => { if (document.pointerLockElement !== canvas && mode === 'playing') pause(); });
+document.addEventListener('pointerlockchange', () => {
+  if (document.pointerLockElement === canvas) return;
+  if (releasing) { releasing = false; return; } // our own release, for a panel or the menu
+  if (mode === 'playing') pause();
+});
 addEventListener('keydown', e => {
   if (['Space', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
   if (e.repeat) { if (mode === 'playing') keys.add(e.code); return; }
