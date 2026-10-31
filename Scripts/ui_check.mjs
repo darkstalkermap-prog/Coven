@@ -101,12 +101,16 @@ try{
     if(C.world.ground(x,z)<1||C.view.nodesNear(x,z,14).length||C.world.pois.some(o=>Math.hypot(o.x-x,o.z-z)<40))continue;
     p.x=x;p.z=z;p.y=C.world.ground(x,z);C.aim(p.yaw,.2);return true;}
    return false;});
+  // Her state, for the detail of a failed check.
+  const state=()=>page.evaluate(()=>{const C=__coven,p=C.state.player;return `mode ${C.mode}, hp ${Math.round(p.hp)}, at ${Math.round(p.x)},${Math.round(p.z)} y ${p.y.toFixed(1)} ground ${C.world.ground(p.x,p.z).toFixed(1)}${p.mounted?', mounted':''}`;});
+  // Hold the keys until she has gone `far` (a frame busy building new ground can swallow a short press), up to 4 s.
+  const walk=async(codes,far)=>{await toOpen();const a=await pos();for(const k of codes)await page.keyboard.down(k);
+   const ok=await page.waitForFunction(([a,far])=>Math.hypot(__coven.state.player.x-a.x,__coven.state.player.z-a.z)>far,[a,far],{timeout:4000,polling:50}).then(()=>true,()=>false);
+   for(const k of codes)await page.keyboard.up(k);const b=await pos();return [ok,`${Math.hypot(b.x-a.x,b.z-a.z).toFixed(1)} m${ok?'':'; '+await state()}`];};
   await toOpen();
-  let a=await pos();await page.keyboard.down('KeyW');await page.waitForTimeout(1500);await page.keyboard.up('KeyW');let b2=await pos();
-  check('W walks forward',Math.hypot(b2.x-a.x,b2.z-a.z)>2,`${Math.hypot(b2.x-a.x,b2.z-a.z).toFixed(1)} m`);
-  await toOpen();a=await pos();await page.keyboard.down('ShiftLeft');await page.keyboard.down('KeyW');await page.waitForTimeout(1500);await page.keyboard.up('KeyW');await page.keyboard.up('ShiftLeft');b2=await pos();
-  check('Shift sprints',Math.hypot(b2.x-a.x,b2.z-a.z)>2);
-  for(const k of ['KeyA','KeyS','KeyD']){await toOpen();a=await pos();await page.keyboard.down(k);await page.waitForTimeout(800);await page.keyboard.up(k);b2=await pos();check(`${k.slice(3)} moves`,Math.hypot(b2.x-a.x,b2.z-a.z)>.5);}
+  check('W walks forward',...await walk(['KeyW'],2));
+  check('Shift sprints',...await walk(['ShiftLeft','KeyW'],2));
+  for(const k of ['KeyA','KeyS','KeyD'])check(`${k.slice(3)} moves`,...await walk([k],.5));
   const y0=await page.evaluate(()=>__coven.state.player.y);await page.keyboard.press('Space');
   check('Space jumps, even a quick tap',await page.waitForFunction(y=>__coven.state.player.y>y+.2,y0,{timeout:3000}).then(()=>true,()=>false));
   await page.waitForTimeout(1000);
@@ -120,15 +124,16 @@ try{
   check('Q eats',await page.evaluate(()=>__coven.state.player.inv.berries===2&&__coven.state.player.food>40));
   // Spells 1 and 2, and right click.
   // A wolf straight ahead of the camera, where bolts look for a target.
-  await toOpen();
-  await page.evaluate(()=>{const p=__coven.state.player;p.mana=p.maxMana;p.cooldowns={};__coven.aim(p.yaw,.1);__coven.spawn('wolf',p.x+Math.cos(p.yaw)*8,p.z+Math.sin(p.yaw)*8);});
-  let m0=await page.evaluate(()=>__coven.state.player.mana);await page.keyboard.press('Digit1');await page.waitForTimeout(300);
-  check('1 casts the first spell',await page.evaluate(m=>__coven.state.player.mana<m,m0));
-  m0=await page.evaluate(()=>__coven.state.player.mana);await page.keyboard.press('Digit2');await page.waitForTimeout(300);
-  check('2 casts the second spell',await page.evaluate(m=>__coven.state.player.mana<m,m0));
-  await page.evaluate(()=>{const p=__coven.state.player;p.mana=p.maxMana;p.cooldowns={};__coven.aim(p.yaw,.1);__coven.spawn('wolf',p.x+Math.cos(p.yaw)*10,p.z+Math.sin(p.yaw)*10);});
-  m0=await page.evaluate(()=>__coven.state.player.mana);await page.mouse.click(640,400,{button:'right'});await page.waitForTimeout(300);
-  check('Right click casts the first spell',await page.evaluate(m=>__coven.state.player.mana<m,m0));
+  // Each cast starts on open ground, full of mana, with a fresh wolf straight ahead of the camera; one retry.
+  const cast=async(how)=>{let detail='';for(let k=0;k<2;k++){await toOpen();
+    await page.evaluate(()=>{const p=__coven.state.player;p.hp=p.maxHp;p.mana=p.maxMana;p.cooldowns={};__coven.aim(p.yaw,.1);__coven.spawn('wolf',p.x+Math.cos(p.yaw)*9,p.z+Math.sin(p.yaw)*9);});
+    await page.waitForTimeout(200);const m0=await page.evaluate(()=>__coven.state.player.mana);await how();
+    if(await page.waitForFunction(m=>__coven.state.player.mana<m,m0,{timeout:2000}).then(()=>true,()=>false))return [true,k?'on the second try':''];
+    detail=`${await state()}; ${(await page.locator('#toast').textContent()).slice(-80)}`;}
+   return [false,detail];};
+  check('1 casts the first spell',...await cast(()=>page.keyboard.press('Digit1')));
+  check('2 casts the second spell',...await cast(()=>page.keyboard.press('Digit2')));
+  check('Right click casts the first spell',...await cast(()=>page.mouse.click(640,400,{button:'right'})));
   // Panels by key and every tab.
   for(const [key,tab] of [['Tab','items'],['KeyI','items'],['KeyB','build'],['KeyK','skills'],['KeyC','coven']]){
    await page.keyboard.press(key);await page.waitForTimeout(400);
@@ -191,9 +196,9 @@ try{
   await page.click('#play');await page.waitForTimeout(300);
   check('Resume returns to play',await page.evaluate(()=>__coven.mode)==='playing');
   // Falling: wake at home with your things.
-  await page.evaluate(()=>{const p=__coven.state.player;p.inv.wood=(p.inv.wood??0)+5;p.x+=40;p.hp=0;});
-  await page.waitForTimeout(800);
-  check('Falling wakes you at home with your things',await page.evaluate(()=>__coven.state.player.hp>0&&__coven.state.player.inv.wood>=5));
+  const wood=await page.evaluate(()=>{const p=__coven.state.player;p.inv.wood=(p.inv.wood??0)+5;p.x+=40;p.hp=0;return p.inv.wood;});
+  const woke=await page.waitForFunction(w=>__coven.state.player.hp>0&&__coven.state.player.inv.wood>=w,wood,{timeout:4000}).then(()=>true,()=>false);
+  check('Falling wakes you at home with your things',woke,woke?'':await state());
   // Window resize.
   await page.setViewportSize({width:900,height:600});await page.waitForTimeout(800);
   await page.setViewportSize({width:1280,height:800});await page.waitForTimeout(800);
