@@ -87,11 +87,18 @@ try{
   check('Music choice remembered',await page.evaluate(()=>JSON.parse(localStorage.getItem('coven-music')).on===true));
   // Walking, jumping, sprinting.
   const pos=()=>page.evaluate(()=>({x:__coven.state.player.x,z:__coven.state.player.z,y:__coven.state.player.y}));
+  // Each movement starts on open ground with the camera behind her, so trees and walls can't spoil it.
+  const toOpen=()=>page.evaluate(()=>{const C=__coven,p=C.state.player;
+   for(let r=0;r<300;r+=10)for(let a=0;a<6.28;a+=.5){const x=p.x+Math.cos(a)*r,z=p.z+Math.sin(a)*r;
+    if(C.world.ground(x,z)<1||C.view.nodesNear(x,z,14).length||C.world.pois.some(o=>Math.hypot(o.x-x,o.z-z)<40))continue;
+    p.x=x;p.z=z;p.y=C.world.ground(x,z);C.aim(p.yaw,.2);return true;}
+   return false;});
+  await toOpen();
   let a=await pos();await page.keyboard.down('KeyW');await page.waitForTimeout(1500);await page.keyboard.up('KeyW');let b2=await pos();
   check('W walks forward',Math.hypot(b2.x-a.x,b2.z-a.z)>2,`${Math.hypot(b2.x-a.x,b2.z-a.z).toFixed(1)} m`);
-  a=b2;await page.keyboard.down('ShiftLeft');await page.keyboard.down('KeyW');await page.waitForTimeout(1500);await page.keyboard.up('KeyW');await page.keyboard.up('ShiftLeft');b2=await pos();
+  await toOpen();a=await pos();await page.keyboard.down('ShiftLeft');await page.keyboard.down('KeyW');await page.waitForTimeout(1500);await page.keyboard.up('KeyW');await page.keyboard.up('ShiftLeft');b2=await pos();
   check('Shift sprints',Math.hypot(b2.x-a.x,b2.z-a.z)>2);
-  for(const k of ['KeyA','KeyS','KeyD']){a=await pos();await page.keyboard.down(k);await page.waitForTimeout(800);await page.keyboard.up(k);b2=await pos();check(`${k.slice(3)} moves`,Math.hypot(b2.x-a.x,b2.z-a.z)>.5);}
+  for(const k of ['KeyA','KeyS','KeyD']){await toOpen();a=await pos();await page.keyboard.down(k);await page.waitForTimeout(800);await page.keyboard.up(k);b2=await pos();check(`${k.slice(3)} moves`,Math.hypot(b2.x-a.x,b2.z-a.z)>.5);}
   const y0=await page.evaluate(()=>__coven.state.player.y);await page.keyboard.press('Space');
   check('Space jumps, even a quick tap',await page.waitForFunction(y=>__coven.state.player.y>y+.2,y0,{timeout:3000}).then(()=>true,()=>false));
   await page.waitForTimeout(1000);
@@ -104,12 +111,14 @@ try{
   await page.keyboard.press('KeyQ');
   check('Q eats',await page.evaluate(()=>__coven.state.player.inv.berries===2&&__coven.state.player.food>40));
   // Spells 1 and 2, and right click.
-  await page.evaluate(()=>{const p=__coven.state.player;p.mana=p.maxMana;p.cooldowns={};__coven.spawn('wolf',p.x+Math.cos(p.yaw)*8,p.z+Math.sin(p.yaw)*8);});
+  // A wolf straight ahead of the camera, where bolts look for a target.
+  await toOpen();
+  await page.evaluate(()=>{const p=__coven.state.player;p.mana=p.maxMana;p.cooldowns={};__coven.aim(p.yaw,.1);__coven.spawn('wolf',p.x+Math.cos(p.yaw)*8,p.z+Math.sin(p.yaw)*8);});
   let m0=await page.evaluate(()=>__coven.state.player.mana);await page.keyboard.press('Digit1');await page.waitForTimeout(300);
   check('1 casts the first spell',await page.evaluate(m=>__coven.state.player.mana<m,m0));
   m0=await page.evaluate(()=>__coven.state.player.mana);await page.keyboard.press('Digit2');await page.waitForTimeout(300);
   check('2 casts the second spell',await page.evaluate(m=>__coven.state.player.mana<m,m0));
-  await page.evaluate(()=>{const p=__coven.state.player;p.mana=p.maxMana;p.cooldowns={};});
+  await page.evaluate(()=>{const p=__coven.state.player;p.mana=p.maxMana;p.cooldowns={};__coven.aim(p.yaw,.1);__coven.spawn('wolf',p.x+Math.cos(p.yaw)*10,p.z+Math.sin(p.yaw)*10);});
   m0=await page.evaluate(()=>__coven.state.player.mana);await page.mouse.click(640,400,{button:'right'});await page.waitForTimeout(300);
   check('Right click casts the first spell',await page.evaluate(m=>__coven.state.player.mana<m,m0));
   // Panels by key and every tab.
