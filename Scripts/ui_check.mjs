@@ -24,7 +24,7 @@ async function open(quality,{viewport={width:1280,height:800},music=false,keep,p
  page.on('dialog',d=>d.accept());
  await page.addInitScript(([q,mu])=>{try{if(!sessionStorage.getItem('seeded')){sessionStorage.setItem('seeded','1');localStorage.setItem('coven-gfx',q);localStorage.setItem('coven-music',mu?'{"on":true,"volume":0.5}':'0');}}catch{}
   // Watch the audio contexts the game makes.
-  const AC=window.AudioContext;window.__audio=[];window.AudioContext=class extends AC{constructor(...a){super(...a);window.__audio.push(this);}};},[quality,music]);
+  const AC=window.__AC=window.AudioContext;window.__audio=[];window.AudioContext=class extends AC{constructor(...a){super(...a);window.__audio.push(this);}};},[quality,music]);
  await page.goto(url);await page.waitForFunction(()=>!!window.__coven);
  return {page,errs,ctx};
 }
@@ -77,11 +77,13 @@ try{
   // Music: started by the click, toggled by N.
   await page.waitForTimeout(1500);
   const audio=()=>page.evaluate(()=>window.__audio.map(a=>a.state));
-  check('Music plays after Begin',(await audio()).includes('running'),JSON.stringify(await audio()));
+  // Machines without a sound device (CI) never run audio at all: then only the switches are checked.
+  const sound=await page.evaluate(async()=>{const c=new window.__AC();await c.resume().catch(()=>{});await new Promise(r=>setTimeout(r,500));const ok=c.state==='running';await c.close();return ok;});
+  check('Music starts with Begin',(await audio()).length>0&&(!sound||(await audio()).includes('running')),`${JSON.stringify(await audio())}${sound?'':' (no sound device here: not required to run)'}`);
   await page.keyboard.press('KeyN');await page.waitForTimeout(600);
   check('N turns the music off',!(await audio()).includes('running')&&!await page.locator('#music-on').isChecked(),JSON.stringify(await audio()));
   await page.keyboard.press('KeyN');await page.waitForTimeout(600);
-  check('N turns it back on',(await audio()).includes('running')&&await page.locator('#music-on').isChecked());
+  check('N turns it back on',(!sound||(await audio()).includes('running'))&&await page.locator('#music-on').isChecked());
   check('Music choice remembered',await page.evaluate(()=>JSON.parse(localStorage.getItem('coven-music')).on===true));
   // Walking, jumping, sprinting.
   const pos=()=>page.evaluate(()=>({x:__coven.state.player.x,z:__coven.state.player.z,y:__coven.state.player.y}));

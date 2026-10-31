@@ -45,7 +45,7 @@ jobs:
         run: |
           set -o pipefail
           # On failure, surface the test's error lines as annotations so they show in the run summary.
-          npm run test:browser 2>&1 | tee browser.log || { grep -E "Error|assert|expected|actual|Timeout|  at |PASS" browser.log | head -25 | sed 's/^/::error::/'; exit 1; }
+          npm run test:browser 2>&1 | tee browser.log || { grep -E "Error|assert|expected|actual|Timeout|  at |PASS|✗|FAILED|checks passed" browser.log | head -40 | sed 's/^/::error::/'; exit 1; }
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
