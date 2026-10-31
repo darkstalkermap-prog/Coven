@@ -31,9 +31,21 @@ try{
  const shot=async name=>{await page.waitForTimeout(2500);const file=`playthrough-${cls}-${name}.png`;await page.screenshot({path:new URL(file,out).pathname});shots.push(file);};
  await shot('start');
  const titles=await page.evaluate(()=>bot.QUESTS);
+ // Hang watch: the debugger is switched on now because it cannot be once the page is stuck. A quest that runs
+ // well past the bot's own limit (two tries of 8 min) is paused, and where it was stuck is printed.
+ const cdp=await page.context().newCDPSession(page);await cdp.send('Debugger.enable');
+ const HANG_MS=18*60*1000;
+ const playQuest=async i=>{
+  let timer;const hang=new Promise(r=>{timer=setTimeout(()=>r(null),HANG_MS);});
+  const r=await Promise.race([page.evaluate(i=>bot.playQuest(i),i),hang]);clearTimeout(timer);
+  if(r)return r;
+  const frames=new Promise(r=>cdp.once('Debugger.paused',e=>r(e.callFrames.slice(0,8).map(f=>`${f.functionName||'(anonymous)'} ${f.url.split('/').pop()||'page'}:${f.location.lineNumber+1}`))));
+  await cdp.send('Debugger.pause');
+  throw new Error(`quest ${i} (${titles[i]}) hung for ${HANG_MS/60000} min, stuck in: ${(await frames).join(' < ')}`);
+ };
  for(let i=Number(from);i<=Number(to);i++){
   const t0=Date.now();
-  const r=await page.evaluate(i=>bot.playQuest(i),i);
+  const r=await playQuest(i);
   const rep=await page.evaluate(()=>bot.report());
   for(const l of rep.log)say('  '+l);
   say(r.already?`✓ ${i} ${titles[i]} — done along the way`:`${r.done?'✓':'✗'} ${i} ${titles[i]} — ${r.minutes} min of play, level ${r.level}, ${Math.round((Date.now()-t0)/1000)} s real`);

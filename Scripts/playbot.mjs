@@ -216,6 +216,9 @@ function heal() {
 // A Healing Draught meant as the Bloom elder's gift is not for drinking.
 const spareHealing = () => count('healing') - (P().coven.length < 3 && !P().coven.includes('bloom') && P().class !== 'bloom' && nextSister() === 'bloom' ? 1 : 0);
 function fightCreature(c, maxTime = 75, cornered = false) {
+  // Fallen at the very end of a step: let the game run on so she wakes at home, or every loop that
+  // calls this would spin without the game moving.
+  if (P().hp <= 0) { sim(.1); return false; }
   dismount();
   lastThreat = `${CREATURE[c.kind]?.name ?? 'the Unwitch'} (level ${CREATURE[c.kind]?.level ?? 15})`;
   const p = P(), [main, second] = CLASSES[p.class].spells, size = c === C.boss ? BOSS.size : CREATURE[c.kind].size;

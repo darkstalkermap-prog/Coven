@@ -263,7 +263,7 @@ Software rendering pays for every pixel on the CPU, so shadows, anti-aliasing an
 
 ### Playthrough
 
-`npm run build && npm run playthrough -- [class] [first quest] [last quest]` lets a bot witch play the whole quest line in headless Chromium, through the game's own keys, mouse and pack buttons, many times faster than real time (`Scripts/playbot.mjs`): she walks round the Crown and the lairs, gathers, crafts, builds her village, brews, trades in a glamour, recruits her sisters, hunts the elite, takes souls, summons the Titan and fights the Unwitch, eating, drinking and healing as she goes. Whatever stops her (getting stuck, dying, a quest she cannot finish) is written to `test-results/playthrough-<class>.md` with screenshots along the way; if she cannot finish a quest she is helped past it and the run goes on.
+`npm run build && npm run playthrough -- [class] [first quest] [last quest]` lets a bot witch play the whole quest line in headless Chromium, through the game's own keys, mouse and pack buttons, many times faster than real time (`Scripts/playbot.mjs`): she walks round the Crown and the lairs, gathers, crafts, builds her village, brews, trades in a glamour, recruits her sisters, hunts the elite, takes souls, summons the Titan and fights the Unwitch, eating, drinking and healing as she goes. Whatever stops her (getting stuck, dying, a quest she cannot finish) is written to `test-results/playthrough-<class>.md` with screenshots along the way; if she cannot finish a quest she is helped past it and the run goes on. A quest that runs far past her own time limit is paused and the place it was stuck is printed.
 
 ### Browser test
 
