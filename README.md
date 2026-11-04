@@ -6,7 +6,7 @@ Built with JavaScript and Three.js (WebGL 2). The world keeps a stylised, low-po
 
 ## Play
 
-**[Play Coven](https://darkstalkermap-prog.github.io/Coven/)** (once GitHub Pages is enabled for this repository), or download `Browser/Play-Coven.html` and open it offline. It is a single self-contained file.
+**[Play Coven](https://darkstalkermap-prog.github.io/Coven/)**, or download `Browser/Play-Coven.html` and open it offline. It is a single self-contained file. The site is published only by the *Deploy Coven to GitHub Pages* workflow (Settings → Pages → Source: GitHub Actions), after the tests pass in Chromium, Google Chrome, Firefox and WebKit.
 
 Use a desktop browser with a keyboard and mouse. Progress saves in the browser's local storage.
 
