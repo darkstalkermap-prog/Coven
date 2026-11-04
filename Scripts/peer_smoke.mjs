@@ -20,7 +20,7 @@ let browser;
 try{
  browser=await launch();
  const errors=[];
- const front=async page=>{await page.bringToFront();if(await page.evaluate(()=>__coven.mode)==='paused')await page.click('#play');await page.waitForTimeout(300);};
+ const front=async page=>{await page.bringToFront();if(await page.evaluate(()=>__coven.mode)==='paused')await page.evaluate(()=>document.querySelector('#play').click());await page.waitForTimeout(300);};
  // Each player's page, on Low graphics: this tests the network, and three games share the machine's CPU.
  async function open(viewport={width:1000,height:700}){
   const page=await (await browser.newContext({viewport})).newPage();

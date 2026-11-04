@@ -10,7 +10,7 @@ let browser;
 try{
  browser=await launch();
  const errors=[];
- const front=async page=>{await page.bringToFront();if(await page.evaluate(()=>__coven.mode)==='paused')await page.click('#play');await page.waitForTimeout(300);};
+ const front=async page=>{await page.bringToFront();if(await page.evaluate(()=>__coven.mode)==='paused')await page.evaluate(()=>document.querySelector('#play').click());await page.waitForTimeout(300);};
  async function witch(name,cls){
   const page=await (await browser.newContext({viewport:{width:1000,height:700}})).newPage();
   page.setDefaultTimeout(60000);
