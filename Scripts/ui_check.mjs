@@ -166,8 +166,11 @@ try{
    let at=null;for(const da of [.3,-.3,.15,-.15,.45,-.45,0])for(const d of [20,16,24,12]){const x=p.x+Math.cos(p.yaw+da)*d,z=p.z+Math.sin(p.yaw+da)*d,h=C.world.ground(x,z);if(!at&&h>1&&Math.abs(h-g)<2)at={x,z};}
    at??={x:p.x+Math.cos(p.yaw+.3)*20,z:p.z+Math.sin(p.yaw+.3)*20};
    C.spawn('elderhorn',at.x,at.z);C.creatures.at(-1).root=120;});
-  const plated=await page.waitForFunction(()=>{const ps=[...document.querySelectorAll('#plates .plate')];
-   return ps.some(e=>/12◆ Elderhorn/.test(e.textContent)&&e.classList.contains('deadly'))&&ps.some(e=>e.classList.contains('target')&&e.querySelector('em').textContent.length>2);},null,{timeout:25000}).then(()=>true,()=>false);
+  // The camera is kept on the elite while waiting (a headless browser can report stray mouse movement that turns it).
+  const plated=await page.waitForFunction(()=>{const C=__coven,p=C.state.player,c=C.creatures.find(c=>c.kind==='elderhorn'&&c.hp>0);
+   if(c)C.aim(Math.atan2(c.z-p.z,c.x-p.x),.1);
+   const ps=[...document.querySelectorAll('#plates .plate')];
+   return ps.some(e=>/12◆ Elderhorn/.test(e.textContent)&&e.classList.contains('deadly'))&&ps.some(e=>e.classList.contains('target')&&e.querySelector('em').textContent.length>2);},null,{timeout:25000,polling:200}).then(()=>true,()=>false);
   check('Name plates show level, name and danger; the aimed one in words',plated,plated?'':JSON.stringify(await page.evaluate(()=>{
    const C=__coven,p=C.state.player,c=C.creatures.find(c=>c.kind==='elderhorn'),m=c&&C.view.entities.get('creatures')?.get(c.id);
    const v=m&&m.position.clone().project(C.view.camera);
