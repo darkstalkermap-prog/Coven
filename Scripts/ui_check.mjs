@@ -119,7 +119,7 @@ try{
   check('Shift sprints',...await walk(['ShiftLeft','KeyW'],2));
   for(const k of ['KeyA','KeyS','KeyD'])check(`${k.slice(3)} moves`,...await walk([k],.5));
   // Smooth motion: sprinting sideways, a point ahead glides across the screen at an even pace (the world used to
-  // judder, its speed jumping by more than its own size from frame to frame).
+  // judder, its speed jumping by more than its own size from frame to frame: 126%; a busy shared machine shows ~30%).
   await toOpen();
   await page.keyboard.down('ShiftLeft');await page.keyboard.down('KeyD');
   const judder=await page.evaluate(()=>new Promise(done=>{const C=__coven,V=C.view,p=C.state.player,v=new V.camera.position.constructor(),fx=p.x+Math.cos(p.yaw)*40,fz=p.z+Math.sin(p.yaw)*40,fy=C.world.ground(fx,fz)+1,rec=[];
@@ -130,7 +130,7 @@ try{
     done(pairs?jump/pairs/(mean/n):1);};
    requestAnimationFrame(tick);}));
   await page.keyboard.up('KeyD');await page.keyboard.up('ShiftLeft');
-  check('Sprinting sideways is smooth (no judder)',judder<.25,`judder ${(judder*100).toFixed(0)}%`);
+  check('Sprinting sideways is smooth (no judder)',judder<.5,`judder ${(judder*100).toFixed(0)}%`);
   await toOpen();await page.waitForTimeout(500); // landed, and rested (sprinting spends the stamina a jump needs)
   const y0=await page.evaluate(()=>{const p=__coven.state.player;p.stamina=p.maxStamina;return p.y;});await page.keyboard.press('Space');
   check('Space jumps, even a quick tap',await page.waitForFunction(y=>__coven.state.player.y>y+.2,y0,{timeout:3000}).then(()=>true,()=>false));
