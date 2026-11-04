@@ -25,7 +25,10 @@ try{
  async function open(viewport={width:1000,height:700}){
   const page=await (await browser.newContext({viewport})).newPage();
   page.setDefaultTimeout(60000);
-  await page.addInitScript(()=>{try{localStorage.setItem('coven-gfx','low');localStorage.setItem('coven-music','0');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('coven-gfx','low');localStorage.setItem('coven-music','0');}catch{}
+   // Several players' windows share one screen here (Firefox needs real windows): one taking focus must not pause
+   // the others' games, as it would for a player switching away from her only window.
+   const add=window.addEventListener;window.addEventListener=function(type,...rest){if(type==='blur')return;return add.call(this,type,...rest);};});
   await page.goto(url,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>!!window.__coven,null,poll);
   return page;
  }

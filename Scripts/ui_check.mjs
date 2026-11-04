@@ -168,7 +168,12 @@ try{
    C.spawn('elderhorn',at.x,at.z);C.creatures.at(-1).root=120;});
   const plated=await page.waitForFunction(()=>{const ps=[...document.querySelectorAll('#plates .plate')];
    return ps.some(e=>/12◆ Elderhorn/.test(e.textContent)&&e.classList.contains('deadly'))&&ps.some(e=>e.classList.contains('target')&&e.querySelector('em').textContent.length>2);},null,{timeout:25000}).then(()=>true,()=>false);
-  check('Name plates show level, name and danger; the aimed one in words',plated,plated?'':JSON.stringify(await page.evaluate(()=>[...document.querySelectorAll('#plates .plate')].map(e=>`${e.className}: ${e.textContent}`))));
+  check('Name plates show level, name and danger; the aimed one in words',plated,plated?'':JSON.stringify(await page.evaluate(()=>{
+   const C=__coven,p=C.state.player,c=C.creatures.find(c=>c.kind==='elderhorn'),m=c&&C.view.entities.get('creatures')?.get(c.id);
+   const v=m&&m.position.clone().project(C.view.camera);
+   return {plates:[...document.querySelectorAll('#plates .plate')].map(e=>`${e.className}: ${e.textContent}`),
+    elite:c?{hp:Math.round(c.hp),dead:!!c.dead,dist:Math.round(Math.hypot(c.x-p.x,c.z-p.z)),dy:+(c.y-p.y).toFixed(1),mesh:!!m,visible:m?.visible,head:C.view.heads.get('elderhorn'),feetOnScreen:v&&[+v.x.toFixed(2),+v.y.toFixed(2),+v.z.toFixed(2)],plate:C.view.headOnScreen('creatures',c.id,'elderhorn')}:'gone',
+    creatures:C.creatures.length,frameMode:C.mode};})));
   await page.evaluate(()=>{for(const c of __coven.creatures)if(c.kind==='elderhorn'){c.hp=0;c.dead=true;}});
   // Panels by key and every tab.
   for(const [key,tab] of [['Tab','items'],['KeyI','items'],['KeyB','build'],['KeyK','skills'],['KeyC','coven']]){

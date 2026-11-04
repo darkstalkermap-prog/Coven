@@ -16,7 +16,10 @@ try{
   page.setDefaultTimeout(60000);
   page.on('pageerror',e=>errors.push(`${name}: ${e.message}`));
   // Low graphics: this tests the network, and both games share the machine's CPU.
-  await page.addInitScript(()=>{try{localStorage.setItem('coven-gfx','low');localStorage.setItem('coven-music','0');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('coven-gfx','low');localStorage.setItem('coven-music','0');}catch{}
+   // Several players' windows share one screen here (Firefox needs real windows): one taking focus must not pause
+   // the others' games, as it would for a player switching away from her only window.
+   const add=window.addEventListener;window.addEventListener=function(type,...rest){if(type==='blur')return;return add.call(this,type,...rest);};});
   await page.goto(origin+'/',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>!!window.__coven);await page.waitForTimeout(800);
   await page.check('#mp-enabled');
   await page.fill('#mp-name',name);await page.fill('#mp-coven','Thornmoot');await page.fill('#mp-world','test');
