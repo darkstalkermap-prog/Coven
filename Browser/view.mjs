@@ -492,7 +492,14 @@ export class WorldView {
     let h = this.heads.get(kind);
     if (h === undefined) { mesh.updateMatrixWorld(true); const box = new THREE.Box3().setFromObject(mesh); h = box.isEmpty() ? 1.5 : (box.max.y - mesh.position.y) / mesh.scale.y; this.heads.set(kind, h); }
     const v = this.plateAt.set(mesh.position.x, mesh.position.y + h * mesh.scale.y + .3, mesh.position.z).project(this.camera);
-    if (v.z > 1 || Math.abs(v.x) > 1.05 || Math.abs(v.y) > 1.05) return null;
+    if (v.z > 1 || Math.abs(v.x) > 1.05 || v.y < -1.05) return null;
+    // A tall creature close by (an elite's antlers) can rise past the top of the view: if its body is still in
+    // sight, the plate waits just under the compass.
+    if (v.y > .78) {
+      const x = v.x, feet = this.plateAt.set(mesh.position.x, mesh.position.y, mesh.position.z).project(this.camera);
+      if (feet.z > 1 || feet.y > 1 || feet.y < -1.05) return null;
+      v.x = x; v.y = .78;
+    }
     return { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight };
   }
   sync(group, list, make, place) {
