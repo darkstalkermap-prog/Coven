@@ -50,7 +50,7 @@ function saveState() { if (state) try { localStorage.setItem(SAVE_KEY, JSON.stri
 const net = new Net();
 let remotes = new Map(), villages = new Map(), serverBoss = null, netTimer = 0, lastSent = '', heartbeat = 0;
 let state = null, explored, creatures = [], allies = [], projectiles = [], boss = null, keys = new Set(), jumpTap = false, mode = 'menu';
-let yaw = 0, pitch = .3, swing = 0, swingCooldown = 0, last = 0, accumulator = 0, saveTimer = 0, spawnTimer = 0, moving = false, hurtFlash = 0, mapBase = null, tab = 'items', nextId = 1;
+let yaw = 0, pitch = .3, swing = 0, swingKind = 'strike', swingCooldown = 0, last = 0, accumulator = 0, saveTimer = 0, spawnTimer = 0, moving = false, hurtFlash = 0, mapBase = null, tab = 'items', nextId = 1;
 
 function begin(s) {
   state = s; buildingsChanged();
@@ -363,7 +363,7 @@ function strike() {
   const p = state.player;
   if (swingCooldown > 0 || p.hp <= 0) return;
   if (p.mounted) { toast('Step off your broom [F] to strike or gather.'); swingCooldown = 1; return; }
-  swing = 1; swingCooldown = .55; p.yaw = yaw;
+  swing = 1; swingKind = 'strike'; swingCooldown = .55; p.yaw = yaw;
   p.stamina = Math.max(0, p.stamina - 5);
   const w = R.weapon(p), tired = p.stamina < 5 ? .5 : 1;
   const target = hostiles().filter(c => c.hp > 0 && near(c, p, w.reach + 1 + (c === boss ? BOSS.size : CREATURE[c.kind].size * .6)) && facing(p, c.x, c.z) > .4).sort((a, b) => dist(a, p) - dist(b, p))[0];
@@ -404,7 +404,7 @@ function cast(index) {
     if (!target) { toast(`${s.name}: no target in sight`); return; }
   }
   trained('spellcraft', R.payCast(p, id));
-  swing = 1; p.yaw = yaw;
+  swing = 1; swingKind = 'cast'; p.yaw = yaw;
   const area = (x, z, radius, fn) => hostiles().filter(c => c.hp > 0 && Math.hypot(c.x - x, c.z - z) < radius).forEach(fn);
   if (s.kind === 'bolt') bolt(p, target, s.damage * power, s.color, { poison: s.poison, slow: s.slow, lifesteal: s.lifesteal, weaken: s.weaken });
   if (s.kind === 'aoe') {
@@ -1038,7 +1038,7 @@ document.addEventListener('pointerlockchange', () => {
 addEventListener('keydown', e => {
   if (['Space', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
   if (e.repeat) { if (mode === 'playing') keys.add(e.code); return; }
-  if (e.code === 'Escape') { if (mode === 'playing') pause(); else if (mode === 'pack' || mode === 'map' || mode === 'help') play(); else if (mode === 'help-menu') closeMenuHelp(); return; }
+  if (e.code === 'Escape') { if (bench) endBench(true); else if (!$('#bench').classList.contains('hidden')) closeBench(); else if (mode === 'playing') pause(); else if (mode === 'pack' || mode === 'map' || mode === 'help') play(); else if (mode === 'help-menu') closeMenuHelp(); return; }
   if (e.code === 'Tab' || e.code === 'KeyI' || e.code === 'KeyB' || e.code === 'KeyK' || e.code === 'KeyC') {
     const want = { Tab: 'items', KeyI: 'items', KeyB: 'build', KeyK: 'skills', KeyC: 'coven' }[e.code];
     if (mode === 'playing') openPanel('pack', want); else if (mode === 'pack') { if (tab === want || e.code === 'Tab') play(); else { tab = want; renderPack(); } }
@@ -1133,7 +1133,7 @@ function renderHelp() {
   <section><h4>THE STORY</h4><p>Four witches once kept the isle: the Bog Witch of the Mirefen, the Hex Witch of the Gloamwood, the Bloom Witch of Springvale and the Wild Witch of the Greenwood. Then the Unwitch rose at the Crown, the isle's heart, and broke their coven. You are the first to come back.</p></section>
   <section><h4>YOUR GOAL</h4><p>Win back the other three paths' elders so your coven is whole again, then go to the Crown (follow the crimson beacon), summon the Wyrd Titan and cast the Grand Rite to break the Unwitch's ward and destroy her. The quest panel on the right always shows your next step.</p></section>
   <section><h4>GETTING STARTED</h4><ul><li>Speak with your elder at your hearth [E].</li><li>Strike trees, rocks, bushes and herbs to gather. Craft a Stone Hatchet [Tab].</li><li>Found your village with a Village Heart [B], then a Cauldron to brew potions.</li><li>Two trees, two bushes and a bird's nest make a Witch's Broom: ride it with [F].</li></ul></section>
-  <section><h4>STAYING ALIVE</h4><ul><li>Watch food and water: eat [Q], cook meat at a fire, drink at ponds or a well.</li><li>The high mountains are cold at night: wear a cloak or keep near a fire.</li><li>If you fall, you wake at home (your hearth, village, hut or an attuned stone circle) with your things.</li><li>The isle is zoned by danger: green 1–3 near the coasts, then yellow, orange and the red Crown at 12–15. The map [M] shows the zones.</li></ul></section>
+  <section><h4>STAYING ALIVE</h4><ul><li>Watch food and water: eat [Q], cook meat at a fire, drink at ponds or a well.</li><li>The high mountains are cold at night: wear a cloak or keep near a fire.</li><li>If you fall, you wake at home (your hearth, village, hut or an attuned stone circle) with your things.</li><li>The isle is zoned by danger: green 1–3 near the coasts, then yellow, orange and the red Crown at 12–15. The map [M] shows the zones.</li><li>Over each creature near you: its level and name, coloured by how dangerous it is for you: <span class="con trivial">grey</span> trivial, <span class="con easy">green</span> easy, <span class="con even">yellow</span> an even fight, <span class="con hard">orange</span> hard, <span class="con deadly">red</span> deadly. ◆ marks an elite, which counts four levels harder. Aim at one to see the verdict in words.</li></ul></section>
   <section><h4>THE COVEN</h4><ul><li>At levels 3, 6 and 9 an elder of another path will join you, if you bring her a gift potion brewed from her own land's herbs.</li><li>Coven rites need two, three or four witches within 25 m. Playing alone, any spell can be cast once its mana and reagents are met; online, real players in the same coven count too.</li></ul></section>
   <section><h4>HUMAN VILLAGES</h4><ul><li>Humans hunt witches. Walk in as yourself and the alarm goes up.</li><li>Cast Glamour [8] to wear a human face, then trade with the merchant for silver, bread, ale and iron tools.</li><li>Any other spell, or striking anyone, breaks the glamour. A human who falls near an empty Soul Jar gives up their soul, the price of the Wyrd Titan.</li></ul></section>
   <section><h4>THE UNWITCH</h4><ul><li>Her ward lets only a tenth of any harm through, until a Grand Rite [7] shatters it for 30 seconds.</li><li>She calls thralls to her side, slams those who come close and hurls bolts at those who don't.</li><li>A Heartfire Sigil (made from an elite's Heartfire and the four lands' essences) makes three: enough for a Titan and two rites.</li></ul></section>
@@ -1153,6 +1153,97 @@ $('#helpBtn').onclick = () => { renderHelp(); $('#help').classList.remove('hidde
 function closeMenuHelp() { $('#help').classList.add('hidden'); mode = state && $('#overlay').classList.contains('hidden') ? 'playing' : state ? 'paused' : 'menu'; }
 document.querySelector('#help [data-close]').onclick = () => (mode === 'help-menu' ? closeMenuHelp() : play());
 
+// ---------- speed test ----------
+// Walks the same route at each graphics level and measures the frame rate, so a player (or a friend) can see what
+// their computer manages and choose a level. Leaves any game as it was. ?benchmark in the address starts it
+// (?benchmark=quick for a short run, used by the tests).
+const BENCH_LEVELS = ['low', 'medium', 'high', 'ultra'];
+const LEVEL_NAMES = { low: 'Low', medium: 'Medium', high: 'High', ultra: 'Ultra' };
+let bench = null, benchReport = null;
+function startBench(quick = false) {
+  if (bench) return;
+  const h = world.hearthOf('meadow'), cx = h.x + 40, cz = h.z + 40;
+  bench = { quick, i: -1, prevMode: mode === 'paused' ? 'paused' : state ? 'paused' : 'menu', cx, cz, r: 45, a: 0, player: { x: cx, y: 0, z: cz, yaw: 0 }, results: [],
+    elders: ELDERS.filter(e => Math.hypot(e.x - cx, e.z - cz) < 300) };
+  mode = 'bench'; keys.clear(); jumpTap = false; releaseMouse();
+  for (const id of ['#overlay', '#help', '#bench', '#pack', '#map', '#classes']) $(id).classList.add('hidden');
+  $('#benchBar').classList.remove('hidden');
+  put('body', 'className', 'is-bench');
+  nextBenchLevel(performance.now());
+}
+function nextBenchLevel(now) {
+  const b = bench;
+  if (++b.i >= BENCH_LEVELS.length) { endBench(false); return; }
+  view.setQuality(BENCH_LEVELS[b.i]);
+  Object.assign(b, { phase: 'warm', t0: now, frames: [], recent: [] });
+}
+function benchFrame(now, raw, dt) {
+  const b = bench, level = BENCH_LEVELS[b.i], p = b.player, t = (now - b.t0) / 1000;
+  // A circle through the Springvale meadow at walking pace: blossom trees, grass, the hearth and its elder.
+  b.a += dt * 5 / b.r;
+  p.x = b.cx + Math.cos(b.a) * b.r; p.z = b.cz + Math.sin(b.a) * b.r; p.y = world.ground(p.x, p.z); p.yaw = b.a + Math.PI / 2;
+  view.stream(p.x, p.z, 2);
+  view.syncWorld({ creatures: [], allies: [], boss: null, buildings: [], projectiles: [], elders: b.elders, now: now / 1000 });
+  view.render({ player: p, yaw: p.yaw, pitch: .18, dayTime: .42, now: now / 1000, dt, swing: 0, toolName: 'fists', lights: hearthFires(), moving: true, sight: false });
+  const warm = b.quick ? .5 : 2.5, measure = b.quick ? 1 : 6;
+  if (b.phase === 'warm') {
+    // Settle first: new ground to build and shaders to compile make the first frames slow.
+    b.recent.push(raw); if (b.recent.length > 10) b.recent.shift();
+    if (t > warm && ((b.recent.length === 10 && Math.max(...b.recent) < .25) || t > warm + (b.quick ? 3 : 8))) Object.assign(b, { phase: 'measure', t0: now, frames: [] });
+  } else {
+    b.frames.push(raw);
+    if (t >= measure) {
+      const f = [...b.frames].sort((x, y) => x - y), avg = f.length / f.reduce((sum, x) => sum + x, 0), low = 1 / f[Math.min(f.length - 1, Math.floor(f.length * .99))];
+      b.results.push({ level, avg, low, verdict: avg >= 55 && low >= 40 ? 'Smooth' : avg >= 30 && low >= 20 ? 'Playable' : 'Slow' });
+      nextBenchLevel(now);
+      return;
+    }
+  }
+  put('#benchBar', 'textContent', `SPEED TEST · ${LEVEL_NAMES[level]} (${b.i + 1} of ${BENCH_LEVELS.length}) · ${b.phase === 'warm' ? 'getting ready' : `measuring, ${Math.max(0, Math.ceil(measure - t))} s`} · Esc stops`);
+}
+function endBench(stopped) {
+  const b = bench;
+  bench = null;
+  view.setQuality(gfx); settleUntil = performance.now() + 3000;
+  $('#benchBar').classList.add('hidden');
+  mode = b.prevMode;
+  $('#overlay').classList.remove('hidden');
+  if (stopped) toast('Speed test stopped.');
+  else showBenchResults(b.results);
+}
+const gpuName = () => {
+  const gl = view.renderer.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info');
+  return String((ext && gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) || gl.getParameter(gl.RENDERER) || 'unknown graphics');
+};
+const browserName = () => {
+  const ua = navigator.userAgent;
+  for (const [re, name] of [[/Edg\/(\d+)/, 'Edge'], [/Firefox\/(\d+)/, 'Firefox'], [/Chrome\/(\d+)/, 'Chrome'], [/Version\/(\d+)[^ ]* (Mobile\/\S+ )?Safari/, 'Safari']]) { const m = re.exec(ua); if (m) return `${name} ${m[1]}`; }
+  return 'unknown browser';
+};
+function showBenchResults(results) {
+  const rev = [...results].reverse(), best = rev.find(r => r.verdict === 'Smooth') ?? rev.find(r => r.verdict === 'Playable') ?? results[0];
+  const info = `${gpuName()} · window ${innerWidth}×${innerHeight} at ${devicePixelRatio}× · ${browserName()}`;
+  const text = [`Coven speed test, ${new Date().toISOString().slice(0, 10)}`, info,
+    ...results.map(r => `${LEVEL_NAMES[r.level].padEnd(7)}${r.avg.toFixed(0).padStart(5)} fps average · slowest 1%${r.low.toFixed(0).padStart(5)} fps · ${r.verdict}`),
+    `Recommended: ${LEVEL_NAMES[best.level]}`].join('\n');
+  benchReport = { text, best: best.level, results };
+  $('#benchBody').innerHTML = `<p class="hint">Coven walked the same route through Springvale at each graphics level on this computer.</p>
+    <table class="benchTable"><tr><th>Level</th><th>Average</th><th>Slowest 1%</th><th></th></tr>${results.map(r => `<tr class="${r.verdict.toLowerCase()}"><td>${LEVEL_NAMES[r.level]}</td><td>${r.avg.toFixed(0)} fps</td><td>${r.low.toFixed(0)} fps</td><td>${r.verdict}</td></tr>`).join('')}</table>
+    <p>Recommended: <b>${LEVEL_NAMES[best.level]}</b>. <span class="hint">Smooth: 55 frames a second or more, rarely below 40. Playable: 30, rarely below 20.</span></p>
+    <p class="hint">${esc(info)}</p>
+    <div class="benchButtons"><button id="benchUse">USE ${LEVEL_NAMES[best.level].toUpperCase()}</button><button id="benchCopy" class="ghost">COPY RESULTS</button></div>
+    <textarea id="benchText" class="hidden" readonly rows="7">${esc(text)}</textarea>`;
+  $('#bench').classList.remove('hidden');
+  $('#benchUse').onclick = () => { setGfx(best.level); closeBench(); toast(`Graphics set to ${LEVEL_NAMES[best.level]}.`); };
+  $('#benchCopy').onclick = () => {
+    const shown = () => { $('#benchText').classList.remove('hidden'); $('#benchText').select(); toast('Select the text and copy it.'); };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(() => toast('Results copied: paste them anywhere.'), shown); else shown();
+  };
+}
+function closeBench() { $('#bench').classList.add('hidden'); }
+$('#benchBtn').onclick = () => startBench();
+document.querySelector('#bench [data-close]').onclick = closeBench;
+
 // Without a save, play starts at class selection, and the menu shows a witch on a ridge at dusk,
 // watching the beacon over the Crown.
 const TITLE_VIEW = { x: -517, z: -188, dayTime: .73, turn: -.4, pitch: -.15 };
@@ -1166,13 +1257,16 @@ window.__coven = { net, get remotes() { return remotes; }, get villages() { retu
   step: seconds => { for (let i = 0; i < seconds * 60 && mode === 'playing'; i++) { update(1 / 60); if (i % 15 === 0) view.stream(state.player.x, state.player.z, 2); } },
   messages };
 if (!saved) state = null;
+// ?benchmark in the address runs the speed test once the game has loaded (?benchmark=quick: a short one).
+{ const b = new URLSearchParams(location.search).get('benchmark'); if (b !== null) setTimeout(() => startBench(b === 'quick'), 1500); }
 
 // Auto graphics: lower the render resolution when frames run slow, raise it again when there is headroom.
 const GFX_KEY = 'coven-gfx';
 let portrait = null, gfx = 'auto', frameAvg = 1 / 60, scaleTimer = 0, hudTimer = 0;
 try { gfx = localStorage.getItem(GFX_KEY) || 'auto'; } catch { /* default */ }
 $('#gfx').value = gfx; view.setQuality(gfx);
-$('#gfx').onchange = () => { gfx = $('#gfx').value; view.setQuality(gfx); settleUntil = performance.now() + 3000; try { localStorage.setItem(GFX_KEY, gfx); } catch { /* not remembered */ } };
+function setGfx(level) { gfx = level; $('#gfx').value = level; view.setQuality(gfx); settleUntil = performance.now() + 3000; try { localStorage.setItem(GFX_KEY, gfx); } catch { /* not remembered */ } }
+$('#gfx').onchange = () => setGfx($('#gfx').value);
 // Auto graphics: lower the render resolution when frames run slow, raise it again when there is headroom, and
 // drop to a simpler level when even that is not enough. It works on the title screen too (the world is drawn
 // behind it), so the level has usually settled by the time you begin.
@@ -1193,24 +1287,88 @@ function autoScale(raw, dt) {
   else scaleTimer = .5;
 }
 
+// ---------- name plates ----------
+// Over each creature within 40 m: its level and name, coloured by how dangerous it is for you (grey trivial, green
+// easy, yellow an even fight, orange hard, red deadly; an elite, ◆, counts four levels harder), a health bar once
+// it is hurt, and on the one your spells would strike, the verdict in words.
+const PLATE_RANGE = 40, plateEls = new Map();
+const CON = [[-Infinity, 'trivial', 'Trivial'], [-5, 'easy', 'Easy'], [-2, 'even', 'Even fight'], [3, 'hard', 'Hard'], [5, 'deadly', 'Deadly']];
+function difficulty(kind, level) { const b = CREATURE[kind], d = b.level - level + (b.elite ? 4 : 0); let r = CON[0]; for (const k of CON) if (d >= k[0]) r = k; return r; }
+function plates(p) {
+  const box = $('#plates'), seen = new Set(), target = mode === 'playing' ? pickTarget(36) : null;
+  for (const c of creatures) {
+    const b = CREATURE[c.kind];
+    if (!b || c.hp <= 0 || c.dead) continue;
+    const d = Math.hypot(c.x - p.x, c.z - p.z);
+    if (d > PLATE_RANGE) continue;
+    const at = view.headOnScreen('creatures', c.id, c.kind);
+    if (!at) continue;
+    seen.add(c.id);
+    let el = plateEls.get(c.id);
+    if (!el) { el = document.createElement('div'); el.innerHTML = '<b></b><span></span><em></em><i><i></i></i>'; el.cache = {}; box.append(el); plateEls.set(c.id, el); }
+    const [, cls, word] = difficulty(c.kind, state.player.level), aimed = c === target, hurt = c.hp < c.maxHp;
+    const key = `${cls}${aimed}${hurt}`;
+    if (el.cache.key !== key) { el.className = `plate ${cls}${aimed ? ' target' : ''}${hurt ? ' hurt' : ''}`; el.cache.key = key; el.children[2].textContent = word; }
+    if (el.cache.kind !== c.kind) { el.children[0].textContent = b.level; el.children[1].textContent = b.elite ? `◆ ${b.name}` : b.name; el.cache.kind = c.kind; }
+    if (hurt) el.children[3].firstChild.style.width = `${Math.max(0, c.hp / c.maxHp * 100).toFixed(1)}%`;
+    el.style.transform = `translate(${at.x.toFixed(1)}px,${at.y.toFixed(1)}px) translate(-50%,-100%)`;
+    el.style.opacity = d > PLATE_RANGE - 10 ? ((PLATE_RANGE - d) / 10).toFixed(2) : '';
+  }
+  for (const [id, el] of plateEls) if (!seen.has(id)) { el.remove(); plateEls.delete(id); }
+}
+
+// The game moves in steps of 1/60 s, which rarely line up with the screen's frames: drawn as they are, moving
+// things jump a step ahead or behind now and then, and the camera with them (worst sideways at speed). So each
+// frame draws everything between the last two steps, as far along as the time since the last step.
+const was = { x: 0, y: 0, z: 0, yaw: 0, turn: 0, swing: 0, at: new WeakMap() }, drawn = { x: 0, y: 0, z: 0, yaw: 0 }, moved = [];
+const turnBy = (a, b) => ((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+function remember() {
+  const p = state.player;
+  Object.assign(was, { x: p.x, y: p.y, z: p.z, yaw: p.yaw, turn: yaw, swing });
+  for (const list of [creatures, allies, projectiles]) for (const c of list) if (!c.remote) { let w = was.at.get(c); if (!w) was.at.set(c, w = {}); w.x = c.x; w.y = c.y; w.z = c.z; w.yaw = c.yaw; w.step = steps; }
+  if (boss) { let w = was.at.get(boss); if (!w) was.at.set(boss, w = {}); Object.assign(w, { x: boss.x, y: boss.y, z: boss.z, yaw: boss.yaw, step: steps }); }
+}
+// Put everything at its in-between place for drawing (and back afterwards with settle()).
+function inBetween(a) {
+  const p = state.player, near = (w, o) => Math.abs(o.x - w.x) + Math.abs(o.z - w.z) < 20; // not across a teleport
+  const t = near(was, p) ? a : 1;
+  drawn.x = was.x + (p.x - was.x) * t; drawn.y = was.y + (p.y - was.y) * t; drawn.z = was.z + (p.z - was.z) * t; drawn.yaw = was.yaw + turnBy(was.yaw, p.yaw) * t;
+  const camYaw = yaw - turnBy(was.turn, yaw) * (1 - a), sw = swing > was.swing ? swing : was.swing + (swing - was.swing) * a;
+  moved.length = 0;
+  for (const list of [creatures, allies, projectiles, boss ? [boss] : []]) for (const c of list) {
+    const w = was.at.get(c);
+    if (!w || w.step !== steps || !near(w, c)) continue; // new since the last step, or far moved
+    moved.push(c, c.x, c.y, c.z, c.yaw);
+    c.x = w.x + (c.x - w.x) * a; c.y = w.y + (c.y - w.y) * a; c.z = w.z + (c.z - w.z) * a;
+    if (c.yaw !== undefined && w.yaw !== undefined) c.yaw = w.yaw + turnBy(w.yaw, c.yaw) * a;
+  }
+  return { camYaw, swing: sw };
+}
+function settle() { for (let i = 0; i < moved.length; i += 5) { const c = moved[i]; c.x = moved[i + 1]; c.y = moved[i + 2]; c.z = moved[i + 3]; c.yaw = moved[i + 4]; } moved.length = 0; }
+let steps = 0;
+
 function frame(now) {
   const raw = (now - last) / 1000, dt = Math.min(raw, .1); last = now;
+  if (bench) { benchFrame(now, raw, dt); requestAnimationFrame(frame); return; }
   autoScale(raw, dt);
-  if (mode === 'playing') { accumulator += dt; while (accumulator >= 1 / 60) { update(1 / 60); accumulator -= 1 / 60; } }
+  if (mode === 'playing') { accumulator += dt; while (accumulator >= 1 / 60) { steps++; remember(); update(1 / 60); accumulator -= 1 / 60; } }
   const s = state ?? preview, p = s.player;
   if (!state) yaw = p.yaw + TITLE_VIEW.turn + Math.sin(now / 9000) * .06; // a slow drift
   // Before there is a game the HUD has nothing to show; the controls bar gives way to the menu.
-  put('body', 'className', [state ? '' : 'fresh', $('#overlay').classList.contains('hidden') ? '' : 'menu'].join(' ').trim());
+  put('body', 'className', [state ? '' : 'is-fresh', $('#overlay').classList.contains('hidden') ? '' : 'is-menu'].join(' ').trim());
   view.stream(p.x, p.z, mode === 'playing' ? 1 : 4);
   if (state) {
     const k = Math.min(1, dt * 10);
     for (const r of remotes.values()) { r.x += (r.tx - r.x) * k; r.z += (r.tz - r.z) * k; r.y += (r.ty - r.y) * k; if (r.moving) r.walk += dt * 6; }
     for (const c of creatures) if (c.remote) { c.x += (c.tx - c.x) * k; c.z += (c.tz - c.z) * k; c.y += (c.ty - c.y) * k; c.hurt = Math.max(0, c.hurt - dt); }
     const built = allBuildings(), lights = lightSources();
+    const live = mode === 'playing' && steps > 0, tween = live ? inBetween(accumulator * 60) : null;
     view.syncRemotes([...remotes.values()], now / 1000);
     view.syncWorld({ creatures, allies, boss, buildings: built, projectiles, elders: elders().filter(e => near(e, p, 300)), now: now / 1000 });
     view.bossDefeated = net.online ? !!serverBoss?.down : state.bossDefeated;
-    view.render({ player: p, yaw, pitch, dayTime: state.dayTime, now: now / 1000, dt, swing, toolName: R.weapon(p).name, lights, moving: moving && mode === 'playing', sight: !!p.effects.sight, sprinting: !!p.sprinting, look: lookOf(p), glamour: !!p.effects.glamour, mounted: !!p.mounted, flying: !!p.flying });
+    view.render({ player: live ? drawn : p, yaw: live ? tween.camYaw : yaw, pitch, dayTime: state.dayTime, now: now / 1000, dt, swing: live ? tween.swing : swing, swingKind, toolName: R.weapon(p).name, lights, moving: moving && mode === 'playing', sight: !!p.effects.sight, sprinting: !!p.sprinting, look: lookOf(p), glamour: !!p.effects.glamour, mounted: !!p.mounted, flying: !!p.flying });
+    plates(live ? drawn : p);
+    if (live) settle();
     put('#hurt', 'className', hurtFlash > 0 ? 'on' : '');
     if (mode === 'pack' && tab === 'items') { portrait ??= new HeroPreview($('#heroCanvas')); portrait.show(p.class, lookOf(p), now / 1000, dt); }
     if ((hudTimer -= dt) <= 0) { hudTimer = .1; hud(); musicMood(); }

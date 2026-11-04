@@ -8,7 +8,7 @@
     "build": "node Scripts/build_browser.mjs",
     "server": "node server/server.mjs",
     "start": "npm run build && node server/server.mjs",
-    "test:browser": "node Scripts/browser_smoke.mjs && node Scripts/multiplayer_smoke.mjs && node Scripts/peer_smoke.mjs && node Scripts/ui_check.mjs",
+    "test:browser": "node Scripts/browser_smoke.mjs && node Scripts/multiplayer_smoke.mjs && node Scripts/peer_smoke.mjs && node Scripts/ui_check.mjs && node Scripts/music_check.mjs",
     "profile": "NO_MINIFY=1 node Scripts/build_browser.mjs && node Scripts/profile.mjs",
     "playthrough": "node Scripts/playthrough.mjs"
   },

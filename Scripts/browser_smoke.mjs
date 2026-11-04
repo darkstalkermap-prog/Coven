@@ -1,4 +1,4 @@
-import {chromium} from 'playwright';
+import {launch,NAME,CHROMIUM_FAMILY} from './browsers.mjs';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {readFile,mkdir} from 'node:fs/promises';
@@ -8,10 +8,10 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const shot=async(page,name)=>page.screenshot({path:new URL(`../test-results/${name}.png`,import.meta.url).pathname});
 let browser;
 try{
- browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{}),args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+ browser=await launch();
  const page=await browser.newPage({viewport:{width:1280,height:800}}),errors=[];
  page.setDefaultTimeout(60000);
- if(process.env.CPU_THROTTLE){const cdp=await page.context().newCDPSession(page);await cdp.send('Emulation.setCPUThrottlingRate',{rate:Number(process.env.CPU_THROTTLE)});}
+ if(process.env.CPU_THROTTLE&&CHROMIUM_FAMILY){const cdp=await page.context().newCDPSession(page);await cdp.send('Emulation.setCPUThrottlingRate',{rate:Number(process.env.CPU_THROTTLE)});}
  // Wait for the game itself to reach a state, however slowly frames render.
  const until=(fn,arg)=>page.waitForFunction(fn,arg,{timeout:60000,polling:100});
  page.on('pageerror',e=>errors.push(e.message));page.on('console',msg=>{if(msg.type()==='error'&&!msg.text().includes('favicon'))errors.push(msg.text());});
@@ -162,5 +162,5 @@ try{
  assert.equal(await page.evaluate(()=>__coven.mode),'menu','Quit returns to the title screen');
  assert.equal(await page.evaluate(()=>__coven.state.player.stats.kills),kills,'Quit saved the game');
  assert.deepEqual(errors,[],'No browser errors');
- console.log('PASS: WebGL 2, Pages subpath, class choice, homeland start, walking, spell bar, village building, alchemy, solo casting with materials, equipment slots, broom riding, Skyward Charm and flight, human village alarm, glamour and trade, soul capture, Wyrd Titan, hunting and loot, map, boss ward and Grand Rite, spell descriptions, quit and continue, no browser errors.');
+ console.log(`PASS (${NAME}): WebGL 2, Pages subpath, class choice, homeland start, walking, spell bar, village building, alchemy, solo casting with materials, equipment slots, broom riding, Skyward Charm and flight, human village alarm, glamour and trade, soul capture, Wyrd Titan, hunting and loot, map, boss ward and Grand Rite, spell descriptions, quit and continue, no browser errors.`);
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

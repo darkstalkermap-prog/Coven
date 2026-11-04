@@ -1,6 +1,6 @@
 // Player-hosted games: one browser hosts and gets a code, another joins with it, and they share the world.
 // Uses a local PeerJS broker and no STUN servers, so it needs no internet.
-import {chromium} from 'playwright';
+import {launch,NAME} from './browsers.mjs';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {readFile,mkdir} from 'node:fs/promises';
@@ -18,7 +18,7 @@ const url=`http://127.0.0.1:${site.address().port}/Coven/?peerhost=127.0.0.1&pee
 const poll={polling:200,timeout:60000};
 let browser;
 try{
- browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{}),args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+ browser=await launch();
  const errors=[];
  // Each player's page, on Low graphics: this tests the network, and three games share the machine's CPU.
  async function open(viewport={width:1000,height:700}){
@@ -73,7 +73,7 @@ try{
  await host.close();
  await guest.waitForFunction(()=>__coven.net.status==='offline'&&/closed the game/.test(document.querySelector('#toast').textContent),null,poll);
  assert.deepEqual(errors,[],'No browser errors');
- console.log('PASS: player-hosted game: four-letter code, join by code, presence, coven count, shared creatures, chat, harvests, wrong code reported, host leaving handled.');
+ console.log(`PASS (${NAME}): player-hosted game: four-letter code, join by code, presence, coven count, shared creatures, chat, harvests, wrong code reported, host leaving handled.`);
 }finally{
  await browser?.close();
  // Drop lingering keep-alive and broker sockets so the servers close and the process exits.

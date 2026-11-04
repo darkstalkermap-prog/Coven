@@ -355,6 +355,31 @@ function bakeSkinned(hero) {
   if (parent) root.updateMatrixWorld(true);
 }
 
+// A strike with the weapon hand, keyed through the swing (0 → 1): wind-up with the staff cocked back over the
+// shoulder, the blow brought over the top and down onto what is in front of her, follow-through across the body,
+// recovery. Hips turn a little ahead of the chest, she leans in on bent knees, and the head stays on the target.
+// A cast instead lifts the weapon hand and points the staff's head at the target while the off hand pushes forward.
+// Per joint, its angle (radians) at each key time; between keys a smooth curve.
+const STRIKE = { t: [.12, .26, .4, .55, .75],
+  armX: [-1.3, -2.55, -.55, -.15, -.45], armZ: [-.25, -.45, -.12, .22, -.12], elbow: [-1, -.8, -.08, -.15, -.85], wrist: [-.1, -.3, .45, .5, .1],
+  hips: [-.03, -.09, .07, .11, .04], chest: [-.08, -.3, .12, .24, .08], lean: [-.02, -.08, .18, .14, .04], crouch: [0, .05, .22, .18, .05], off: [-.1, -.25, .25, .3, .1] };
+const CAST = { t: [.12, .3, .5, .75],
+  armX: [-.9, -1.45, -1.35, -.7], armZ: [-.2, -.15, -.1, -.15], elbow: [-.6, -.3, -.25, -.7], wrist: [0, .55, .45, .1],
+  hips: [0, .03, .03, 0], chest: [-.05, .1, .08, 0], lean: [0, .08, .06, 0], crouch: [0, .06, .04, 0], off: [-.2, -.45, -.35, -.1] };
+// Catmull-Rom through the keys of one joint, flat before the first and after the last.
+function keyed(k, joint, u) {
+  const t = k.t, v = k[joint], n = t.length;
+  if (u <= t[0]) return v[0];
+  if (u >= t[n - 1]) return v[n - 1];
+  let i = 0;
+  while (u > t[i + 1]) i++;
+  const s = (u - t[i]) / (t[i + 1] - t[i]), p0 = v[Math.max(0, i - 1)], p1 = v[i], p2 = v[i + 1], p3 = v[Math.min(n - 1, i + 2)];
+  return .5 * (2 * p1 + (p2 - p0) * s + (2 * p0 - 5 * p1 + 4 * p2 - p3) * s * s + (3 * p1 - p0 - 3 * p2 + p3) * s * s * s);
+}
+const ease = x => x * x * (3 - 2 * x);
+// Long weapons stand upright through the fist, the forearm forward: how a tall staff is really held.
+const POLES = new Set(['staff', 'spear']);
+
 export class Hero {
   constructor(kit, classId, look = {}, { scale = 1, revealing = false } = {}) {
     this.kit = kit; this.cls = PALETTES[classId] ? classId : 'wild'; this.pal = PALETTES[this.cls]; this.style = STYLES[this.cls];
@@ -789,6 +814,7 @@ export class Hero {
     this.legs.forEach(l => this.boot(l.boot, look.feet?.[1] ?? -1));
     if (look.cloak) this.cape(look.cloak[1]);
     if (look.amulet) this.amulet(look.amulet[1]);
+    this.weaponKind = look.weapon?.[0] ?? null;
     if (look.weapon) this.weapon(...look.weapon);
     for (const g of this.gear) foldFixed(g);
     this.capeMesh = this.gear.find(g => g.userData.cape)?.userData.cape ?? null;
@@ -977,6 +1003,8 @@ export class Hero {
   weapon(kind, r) {
     const P = this.pal, T = TIERS[Math.max(0, r)], hand = this.arms[1].hand, g = this.wear(hand, new THREE.Group());
     g.position.set(0, -.04, .02);
+    // A pole passes through the fist across the hand (at right angles to the forearm), as a real grip holds it.
+    if (POLES.has(kind)) g.rotation.x = Math.PI / 2;
     const wood = this.m(P.wood, { rough: .75 }), metal = this.m(T.metal, { metal: T.metalness, rough: T.roughness });
     const gem = this.m(r >= 2 ? T.trim : P.crystal, { glow: 1.2 + T.glow, rough: .05, metal: .1, opacity: .9 });
     if (kind === 'staff') {
@@ -1102,11 +1130,35 @@ export class Hero {
       if (this.held) { off.shoulder.rotation.set(-1.05 - S.hunch * .5 + breath * .02, .2, .35); off.elbow.rotation.x = -.85; }
       else if (this.cls === 'wild') { off.shoulder.rotation.set(-1.3 + Math.sin(now * .8) * .05, .1, .2); off.elbow.rotation.x = -.15; }
     }
-    if (s.swing > 0) { const k = Math.sin((1 - s.swing) * Math.PI); this.arms[1].shoulder.rotation.x = -2.3 * k; this.arms[1].shoulder.rotation.z = -.3 * k; this.arms[1].elbow.rotation.x = -.2; }
+    // A tall staff or spear: the forearm forward and the pole upright through the fist, barely swinging as she walks.
+    const main = this.arms[1];
+    if (POLES.has(this.weaponKind) && !s.mounted && !s.glamour) {
+      main.shoulder.rotation.x = -.32 + Math.sin(ph) * .12 * walk - S.hunch * .5; main.shoulder.rotation.z = -.2; main.elbow.rotation.x = -1.22 - run * .12;
+    }
+    main.hand.rotation.x = 0;
+    let twist = 0, crouch = 0;
+    if (s.swing > 0 && !s.mounted) {
+      // The strike (or cast) eases in from the pose she is in and back out to it.
+      const k = s.swingKind === 'cast' ? CAST : STRIKE, u = 1 - s.swing, w = u < .12 ? ease(u / .12) : u > .75 ? ease((1 - u) / .25) : 1;
+      const to = (cur, joint) => cur + (keyed(k, joint, u) - cur) * w;
+      main.shoulder.rotation.x = to(main.shoulder.rotation.x, 'armX');
+      main.shoulder.rotation.z = to(main.shoulder.rotation.z, 'armZ');
+      main.elbow.rotation.x = to(main.elbow.rotation.x, 'elbow');
+      main.hand.rotation.x = keyed(k, 'wrist', u) * w;
+      this.arms[0].shoulder.rotation.x += keyed(k, 'off', u) * w;
+      this.body.rotation.y = keyed(k, 'hips', u) * w;
+      this.torso.rotation.y = keyed(k, 'chest', u) * w;
+      this.torso.rotation.x += keyed(k, 'lean', u) * w;
+      crouch = keyed(k, 'crouch', u) * w;
+      twist = this.body.rotation.y + this.torso.rotation.y;
+    } else { this.body.rotation.y = 0; this.torso.rotation.y = 0; }
+    // Into the blow on bent knees, the hips dropping to keep the feet down.
+    if (crouch) { for (const l of this.legs) { l.knee.rotation.x += crouch; l.hip.rotation.x -= crouch * .5; } this.body.position.y -= crouch * .1; }
     // Bell sleeves hang from the elbow under their own weight, whatever the arm is doing.
     for (const a of this.arms) if (a.sleeve) a.sleeve.rotation.x = -(a.shoulder.rotation.x + a.elbow.rotation.x + this.torso.rotation.x) * .8;
     this.strands.rotation.x = .1 + this.sway * .5 + Math.sin(now * 1.7) * .03;
     this.lookAround(dt, now, s.look);
+    if (twist) this.head.rotation.y -= twist * .75; // eyes stay on the target while the body turns
     if (this.hatTip) this.hatTip.rotation.z = Math.sin(now * 2 + ph) * .3;
     if (this.orb) this.orb.rotation.y = now * 1.5;
     if (this.lantern) this.lantern.rotation.z = Math.sin(now * 2.2 + ph) * .25;

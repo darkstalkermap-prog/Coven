@@ -121,7 +121,28 @@ footer{position:absolute;bottom:0;left:0;right:0;padding:12px 24px;display:flex;
 #touchNote{display:none;margin-top:16px;font:11px Arial,sans-serif;color:var(--gold)}
 @media(hover:none) and (pointer:coarse){#touchNote{display:block}}
 @media(max-width:760px){footer{display:none}#spells{bottom:12px}#hud{bottom:184px}}
-body.fresh :is(#compass,#region,#clock,#coven,#quest,#hud,#spells,#prompt,#crosshair),body.fresh footer,body.menu footer,body.menu #hud{visibility:hidden}
+body.is-fresh :is(#compass,#region,#clock,#coven,#quest,#hud,#spells,#prompt,#crosshair),body.is-fresh footer,body.is-menu footer,body.is-menu #hud,body.is-menu #spells{visibility:hidden}
+#bench{z-index:30}#benchBar{position:absolute;top:22px;left:50%;transform:translateX(-50%);padding:8px 16px;background:var(--panel);border:1px solid #9a6bff55;font:11px Arial,sans-serif;letter-spacing:2px;color:#e6dcf3;white-space:nowrap}
+body.is-bench :is(#compass,#region,#clock,#coven,#quest,#hud,#spells,#prompt,#crosshair,#boss,#chat,#netStatus,#plates),body.is-bench footer{visibility:hidden}
+.benchTable{width:100%;border-collapse:collapse;margin:12px 0;font:13px Arial,sans-serif}.benchTable th{text-align:left;font-size:10px;letter-spacing:2px;color:var(--gold);font-weight:normal;padding:4px 6px}
+.benchTable td{padding:7px 6px;border-top:1px solid #ffffff12}.benchTable tr.smooth td:last-child{color:#8fe08a}.benchTable tr.playable td:last-child{color:#e8d06a}.benchTable tr.slow td:last-child{color:#ff8a7a}
+.benchButtons{display:flex;gap:10px;margin-top:12px}#benchText{width:100%;margin-top:10px;background:#0c0910;color:#e6dcf3;border:1px solid #ffffff22;font:11px monospace}
 
 #helpBody section.spells{column-span:all}#helpBody section.spells p{margin:10px 0 2px;color:#e8deff}#helpBody section.spells b{color:var(--gold);font-weight:normal}#helpBody section.spells small{color:var(--dim)}
 #quit{margin-top:8px}
+
+/* Name plates over creatures, coloured by difficulty */
+#plates{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.plate{position:absolute;left:0;top:0;display:flex;align-items:center;gap:5px;white-space:nowrap;font:12px Arial,sans-serif;color:var(--con);text-shadow:0 1px 3px #000,0 0 2px #000;will-change:transform}
+.plate b{padding:0 4px;border:1px solid var(--con);border-radius:3px;background:#000a;font-size:10px;line-height:14px}
+.plate em{display:none;font-style:normal;font-size:10px;letter-spacing:1px;text-transform:uppercase}
+.plate.target{font-size:13px;z-index:1}.plate.target em{display:inline}
+.plate>i{display:none;position:absolute;left:0;right:0;bottom:-6px;height:3px;background:#000a}.plate.hurt>i{display:block}.plate>i>i{position:absolute;left:0;top:0;bottom:0;width:100%;background:var(--con)}
+.plate.trivial,.con.trivial{--con:#a8a8a8}.plate.easy,.con.easy{--con:#6fd96a}.plate.even,.con.even{--con:#f2d24a}.plate.hard,.con.hard{--con:#ff9a3a}.plate.deadly,.con.deadly{--con:#ff4d4d}
+.con{color:var(--con)}
+body.is-menu #plates,body.is-fresh #plates{visibility:hidden}
+
+/* The menu fits short screens (laptops): it centres when it fits and scrolls when it doesn't, never cut off. */
+#overlay{align-items:flex-start;overflow-y:auto}.menu{margin-top:auto;margin-bottom:auto;padding:20px 0}
+@media(max-height:860px){h1{font-size:68px;letter-spacing:9px;margin:6px 0}.rules{display:none}.menu p{line-height:1.6}}
+@media(max-height:680px){#description{display:none}}

@@ -2,7 +2,7 @@
 // side. Measures what each one sees (frame time, how smoothly and how accurately the other three move on her
 // screen), the network traffic per player and the server's work, and fails on any browser error or desync.
 // Usage: node Scripts/four_player_sim.mjs [seconds] [quality]
-import {chromium} from 'playwright';
+import {launch,NAME} from './browsers.mjs';
 import {spawn,execSync} from 'node:child_process';
 const [seconds='40',quality='low']=process.argv.slice(2);
 const server=spawn(process.execPath,['server/server.mjs'],{env:{...process.env,PORT:'0'},stdio:['ignore','pipe','inherit']});
@@ -11,7 +11,7 @@ const cpu=()=>{try{return Number(execSync(`ps -o cputime= -p ${server.pid}`).toS
 let browser;
 const errors=[];
 try{
- browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{}),args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+ browser=await launch();
  const join=async(name,cls)=>{
   const page=await (await browser.newContext({viewport:{width:640,height:400}})).newPage();
   page.on('pageerror',e=>errors.push(`${name}: ${e.message}`));
@@ -64,12 +64,12 @@ try{
  const stats=await Promise.all(pages.map(p=>p.evaluate(()=>{const f=[...window.__rec.frames].sort((a,b)=>a-b),all=window.__rec.jumps,j=all.filter(d=>d<50).sort((a,b)=>a-b);
   return {frames:f.length,avg:f.reduce((a,b)=>a+b,0)/f.length,p95:f[Math.floor(f.length*.95)],jumpP99:j[Math.floor(j.length*.99)]??0,jumpMax:j.at(-1)??0,snaps:all.length-j.length,remotes:__coven.remotes.size,creatures:__coven.creatures.length,online:__coven.net.online};})));
  const errorOf=seen.map((list,i)=>list.map(r=>{const real=truth.find(t=>t.id===r.id);return real?Math.hypot(real.x-r.x,real.z-r.z):NaN;}));
- console.log(`four players, ${wall.toFixed(0)} s, ${quality} graphics (all four browsers share one CPU, so frame times are pessimistic)`);
+ console.log(`four players in ${NAME}, ${wall.toFixed(0)} s, ${quality} graphics (all four browsers share one CPU, so frame times are pessimistic)`);
  names.forEach(([n],i)=>{const s=stats[i],up=(t1[i].sent-t0[i].sent)/wall,down=(t1[i].recv-t0[i].recv)/wall;
   console.log(`${n.padEnd(7)} ${(1000/s.avg).toFixed(1)} fps (p95 ${s.p95.toFixed(0)} ms) · sees ${s.remotes} others · up ${(up/1024).toFixed(1)} KB/s ${((t1[i].sentMsgs-t0[i].sentMsgs)/wall).toFixed(1)} msg/s · down ${(down/1024).toFixed(1)} KB/s ${((t1[i].recvMsgs-t0[i].recvMsgs)/wall).toFixed(1)} msg/s · others drawn ${Math.max(...errorOf[i]).toFixed(2)} m from where they are · per-frame move p99 ${s.jumpP99.toFixed(2)} m, max ${s.jumpMax.toFixed(2)} m${s.snaps?` (+${s.snaps} teleport snap)`:''}`);});
  console.log(`server CPU ${(cpuUsed/wall*100).toFixed(1)}% of one core`);
  const bad=stats.some(s=>s.remotes!==3||!s.online)||errors.length||errorOf.flat().some(e=>!(e<6))||stats.some(s=>s.jumpMax>Math.max(4,s.p95/1000*30));
  if(errors.length)console.log('errors:\n'+errors.slice(0,10).join('\n'));
- console.log(bad?'FAIL':'PASS: four players stay in sync, smooth and error-free');
+ console.log(bad?'FAIL':`PASS (${NAME}): four players stay in sync, smooth and error-free`);
  process.exitCode=bad?1:0;
 }finally{await browser?.close();server.kill();}

@@ -28,6 +28,7 @@
   <div class="xp"><div id="xp"></div></div>
  </div>
 </section>
+<div id="plates"></div>
 <div id="spells"></div>
 <footer><span><kbd>WASD</kbd> move</span><span><kbd>SHIFT</kbd> sprint</span><span><kbd>SPACE</kbd> jump</span><span><kbd>LMB</kbd> strike / gather</span><span><kbd>RMB</kbd> or <kbd>1</kbd>–<kbd>0</kbd> spells</span><span><kbd>E</kbd> interact</span><span><kbd>Q</kbd> eat</span><span><kbd>TAB</kbd>/<kbd>I</kbd> inventory</span><span><kbd>F</kbd> broom</span><span><kbd>B</kbd> build</span><span><kbd>K</kbd> skills</span><span><kbd>C</kbd> coven</span><span><kbd>M</kbd> map</span><span><kbd>H</kbd> how to play</span><span><kbd>N</kbd> music</span><span><kbd>ENTER</kbd> chat</span></footer>
 
@@ -35,6 +36,8 @@
 
 <section id="map" class="panel hidden"><div class="panelHead"><h2>The Isle</h2><button data-close>CLOSE <kbd>M</kbd></button></div><canvas id="mapCanvas" width="640" height="640"></canvas><p class="hint">Four lands around the Crown, 5 km across. Zones are outlined in green, yellow, orange and red with their level ranges. Hearths ⌂ and the Crown ♛ are always known; other places appear once found.</p></section>
 
+<section id="bench" class="panel hidden"><div class="panelHead"><h2>Speed test</h2><button data-close>CLOSE <kbd>ESC</kbd></button></div><div id="benchBody"></div></section>
+<div id="benchBar" class="hidden"></div>
 <section id="help" class="panel hidden wide"><div class="panelHead"><h2>How to play</h2><button data-close>CLOSE <kbd>H</kbd></button></div><div id="helpBody"></div></section>
 
 <section id="classes" class="hidden"><div class="classWrap"><div class="eyebrow">CHOOSE YOUR PATH</div><h2>Which witch are you?</h2><p class="hint">You begin at your homeland's hearth. Sisters of the other three paths can join your coven later.</p><div id="classCards"></div><button id="classBack" class="ghost">← BACK</button></div></section>
@@ -59,6 +62,7 @@
  <div class="sound"><label class="check" data-tip="Witchy music made as you play: harp, flute and drone by day, a music box by night, drums when danger is near. [N] in game."><input type="checkbox" id="music-on" checked> Music</label><input type="range" id="music-vol" min="0" max="100" value="50" aria-label="Music volume" data-tip="Music volume"></div>
  <button id="play">BEGIN <span>→</span></button>
  <button id="helpBtn" class="ghost">HOW TO PLAY</button>
+ <button id="benchBtn" class="ghost" data-tip="Walk a set route at each graphics level and measure how smoothly this computer runs Coven (about a minute). Your game is left as it was.">SPEED TEST</button>
  <button id="newGame" class="ghost hidden">START A NEW LIFE</button>
  <button id="quit" class="ghost hidden" data-tip="Save and leave for the title screen. Your witch, her pack and her village wait for you to continue.">QUIT GAME</button>
  <small id="touchNote">Coven is played with a keyboard and mouse: open it on a computer to play.</small>

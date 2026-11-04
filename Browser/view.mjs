@@ -126,6 +126,7 @@ export class WorldView {
     this.nodeIndex = new Map();
     this.hidden = new Set();
     this.entities = new Map();
+    this.heads = new Map(); this.plateAt = new THREE.Vector3(); // name plates: head height by kind, a scratch vector
     this.effects = [];
 
     // Opaque water: a see-through plane over most of the screen costs a lot of fill on weak GPUs. Plain on Low,
@@ -484,6 +485,16 @@ export class WorldView {
 
   // ---------- entities ----------
   // Keep one mesh per item of `list` under the named group; `make(item)` builds a new one.
+  // Where a creature's head shows on screen, for its name plate: null when behind the camera or off the edge.
+  headOnScreen(group, id, kind) {
+    const mesh = this.entities.get(group)?.get(id);
+    if (!mesh?.visible) return null;
+    let h = this.heads.get(kind);
+    if (h === undefined) { mesh.updateMatrixWorld(true); const box = new THREE.Box3().setFromObject(mesh); h = box.isEmpty() ? 1.5 : (box.max.y - mesh.position.y) / mesh.scale.y; this.heads.set(kind, h); }
+    const v = this.plateAt.set(mesh.position.x, mesh.position.y + h * mesh.scale.y + .3, mesh.position.z).project(this.camera);
+    if (v.z > 1 || Math.abs(v.x) > 1.05 || Math.abs(v.y) > 1.05) return null;
+    return { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight };
+  }
   sync(group, list, make, place) {
     const map = this.entities.get(group) ?? new Map(), live = new Set();
     this.entities.set(group, map);
@@ -578,13 +589,13 @@ export class WorldView {
   }
 
   render(state) {
-    const { player, yaw, pitch, dayTime, now, swing, lights, moving, sprinting = false, sight, dt, glamour = false, mounted = false, flying = false, look = {} } = state;
+    const { player, yaw, pitch, dayTime, now, swing, swingKind = 'strike', lights, moving, sprinting = false, sight, dt, glamour = false, mounted = false, flying = false, look = {} } = state;
     const w = this.player;
     w.position.set(player.x, player.y, player.z); w.rotation.y = -player.yaw + Math.PI / 2;
     this.playerHero.setLook(look);
     // Standing still, she glances at the camera when it is in front of her.
     const lookAt = moving || !this.camAt ? null : this.camAt;
-    this.playerHero.update(dt, now, { moving, sprinting, swing, mounted, flying, glamour, ground: this.groundFn, look: lookAt });
+    this.playerHero.update(dt, now, { moving, sprinting, swing, swingKind, mounted, flying, glamour, ground: this.groundFn, look: lookAt });
     if (this.pet) this.pet.visible = !glamour && (!flying || this.pet.userData.plan === 'bird');
     if (this.pet) {
       const t = this.pet, raven = t.userData.plan === 'bird', tx = player.x - Math.cos(player.yaw + .9) * 1.4, tz = player.z - Math.sin(player.yaw + .9) * 1.4;
@@ -594,15 +605,21 @@ export class WorldView {
       this.pose(t, { x: t.position.x, y: t.position.y, z: t.position.z, yaw: player.yaw }, moving ? now * 6 : 0, now);
     }
 
-    // The camera rides a little over your right shoulder and follows smoothly, never sinking into the hill.
+    // The camera rides a little over your right shoulder, fixed to you: easing after you would lag by an amount
+    // that changes with every frame's length, and the view would judder whenever you move fast (sideways most).
+    // Only the lift over a rising hill is eased, quickly up and gently back down, and it never sinks into the ground.
     const dist = 5.6, side = .45, sx = -Math.sin(yaw) * side, sz = Math.cos(yaw) * side;
     const cx = player.x - Math.cos(yaw) * Math.cos(pitch) * dist + sx, cz = player.z - Math.sin(yaw) * Math.cos(pitch) * dist + sz;
-    const cy = Math.max(player.y + 1.8 + Math.sin(pitch) * dist, this.world.ground(cx, cz) + .6, .8);
-    const follow = this.camAt && Math.hypot(cx - this.camAt.x, cz - this.camAt.z) < 30 ? 1 - Math.exp(-dt * 14) : 1;
-    this.camAt = (this.camAt ?? new THREE.Vector3(cx, cy, cz)).lerp(new THREE.Vector3(cx, cy, cz), follow);
-    this.camAt.y = Math.max(this.camAt.y, this.world.ground(this.camAt.x, this.camAt.z) + .6);
+    // Height alone is eased (a jump shouldn't bob the whole view), in a way that stays exact at any frame rate:
+    // it follows her vertical speed, so rising or falling steadily never judders.
+    if (this.camY === undefined || !(dt > 0) || Math.abs(player.y - this.camPrevY) > 10) this.camY = player.y;
+    else { const v = (player.y - this.camPrevY) / dt, k = 8; this.camY = player.y - v / k + (this.camY - this.camPrevY + v / k) * Math.exp(-k * dt); }
+    this.camPrevY = player.y;
+    const base = this.camY + 1.8 + Math.sin(pitch) * dist, floor = Math.max(this.world.ground(cx, cz) + .6, .8), need = Math.max(0, floor - base);
+    this.lift = (this.lift ?? need) + (need - (this.lift ?? need)) * (1 - Math.exp(-dt * (need > (this.lift ?? 0) ? 14 : 5)));
+    this.camAt = (this.camAt ?? new THREE.Vector3()).set(cx, Math.max(base + this.lift, floor - .35), cz);
     this.camera.position.copy(this.camAt);
-    this.camera.lookAt(player.x + sx, player.y + 1.6, player.z + sz);
+    this.camera.lookAt(player.x + sx, this.camY + 1.6, player.z + sz);
 
     // Day/night: dayTime 0..1, 0.25 sunrise, 0.5 noon, 0.75 sunset.
     const { day, dusk, sunDir, horizon } = this.sky.update(this.camera, dayTime, now, dt, player), see = sight ? .5 : 0;

@@ -1,5 +1,5 @@
 // Starts the real Coven server and two browsers, and checks they share one world.
-import {chromium} from 'playwright';
+import {launch,NAME} from './browsers.mjs';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {mkdir} from 'node:fs/promises';
@@ -8,7 +8,7 @@ const server=spawn(process.execPath,['server/server.mjs'],{env:{...process.env,P
 const origin=await new Promise((resolve,reject)=>{server.stdout.on('data',d=>{const m=/http:\/\/localhost:(\d+)/.exec(String(d));if(m)resolve(`http://127.0.0.1:${m[1]}`);});server.on('exit',()=>reject(new Error('Server exited')));});
 let browser;
 try{
- browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{}),args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+ browser=await launch();
  const errors=[];
  async function witch(name,cls){
   const page=await (await browser.newContext({viewport:{width:1000,height:700}})).newPage();
@@ -81,5 +81,5 @@ try{
  await b.waitForFunction(ids=>ids.some(id=>__coven.creatures.some(c=>c.id===id&&!c.remote)),owned).catch(async e=>{
   console.log('handed over?',owned,await b.evaluate(()=>__coven.creatures.filter(c=>c.village===undefined).map(c=>[c.id,c.kind,c.remote?'remote':'ours',Math.round(c.hp)])));throw e;});
  assert.deepEqual(errors,[],'No browser errors');
- console.log('PASS: two browsers share a world: presence, real coven count, coven rite, shared harvesting, shared villages, chat, shared creatures with kill credit, cross-player bites, creature handover on leave.');
+ console.log(`PASS (${NAME}): two browsers share a world: presence, real coven count, coven rite, shared harvesting, shared villages, chat, shared creatures with kill credit, cross-player bites, creature handover on leave.`);
 }finally{await browser?.close();server.kill();}
