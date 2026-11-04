@@ -78,8 +78,10 @@ jobs:
           BROWSER: ${{ matrix.browser }}
         run: |
           set -o pipefail
+          # Firefox needs a window (on a virtual display) to get WebGL without a graphics card.
+          RUN=; if [ "$BROWSER" = firefox ]; then export HEADED=1; RUN="xvfb-run -a"; fi
           # On failure, surface the test's error lines as annotations so they show in the run summary.
-          npm run test:browser 2>&1 | tee browser.log || { grep -E "Error|assert|expected|actual|Timeout|  at |PASS|✗|FAILED|checks passed|events:" browser.log | head -40 | sed "s/^/::error::${{ matrix.browser }}: /"; exit 1; }
+          $RUN npm run test:browser 2>&1 | tee browser.log || { grep -E "Error|assert|expected|actual|Timeout|  at |PASS|✗|FAILED|checks passed|events:" browser.log | head -40 | sed "s/^/::error::${{ matrix.browser }}: /"; exit 1; }
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -137,7 +139,8 @@ jobs:
           BROWSER: ${{ matrix.browser }}
         run: |
           set -o pipefail
-          node Scripts/live_check.mjs "${{ needs.deploy.outputs.page_url }}" 2>&1 | tee live.log || { grep -E "try|✗|FAILED" live.log | sed "s/^/::error::${{ matrix.browser }}: /"; exit 1; }
+          RUN=; if [ "$BROWSER" = firefox ]; then export HEADED=1; RUN="xvfb-run -a"; fi
+          $RUN node Scripts/live_check.mjs "${{ needs.deploy.outputs.page_url }}" 2>&1 | tee live.log || { grep -E "try|✗|FAILED" live.log | sed "s/^/::error::${{ matrix.browser }}: /"; exit 1; }
       - uses: actions/upload-artifact@v4
         if: always()
         with:

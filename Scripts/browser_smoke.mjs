@@ -16,7 +16,10 @@ try{
  const until=(fn,arg)=>page.waitForFunction(fn,arg,{timeout:60000,polling:100});
  page.on('pageerror',e=>errors.push(e.message));page.on('console',msg=>{if(msg.type()==='error'&&!msg.text().includes('favicon'))errors.push(msg.text());});
  await page.goto(`http://127.0.0.1:${server.address().port}/Coven/`);
- await until(()=>!!window.__coven);
+ // If the game cannot start (no WebGL 2, a script error), say why rather than only timing out.
+ await until(()=>!!window.__coven).catch(async e=>{
+  const why=await page.evaluate(()=>({message:document.querySelector('#description')?.textContent,webgl2:!!document.createElement('canvas').getContext('webgl2'),webgl:!!document.createElement('canvas').getContext('webgl')})).catch(()=>({}));
+  console.log(`The game did not start in ${NAME}: ${JSON.stringify(why)}${errors.length?`\nbrowser errors:\n  ${errors.slice(0,5).join('\n  ')}`:''}`);throw e;});
  assert.equal(await page.locator('#play').isEnabled(),true,'WebGL initializes');
  assert.ok(await page.evaluate(()=>!!document.querySelector('canvas').getContext('webgl2')),'Uses WebGL 2');
  await mkdir(new URL('../test-results/',import.meta.url),{recursive:true});

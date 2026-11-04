@@ -33,6 +33,8 @@ try{
  const spot=await a.evaluate(()=>({x:__coven.state.player.x,z:__coven.state.player.z}));
  await b.evaluate(s=>{const p=__coven.state.player;p.x=s.x+3;p.z=s.z;},spot);
  await a.waitForFunction(()=>{const r=[...__coven.remotes.values()][0];return Math.hypot(r.x-__coven.state.player.x,r.z-__coven.state.player.z)<6;});
+ // (The coven count on screen refreshes ten times a second.)
+ await a.waitForFunction(()=>/COVEN 2\/4/.test(document.querySelector('#covenList small').textContent),null,{timeout:10000}).catch(()=>{});
  assert.match(await a.locator('#covenList small').textContent(),/COVEN 2\/4/,'Real coven-mate counts toward the coven');
  await a.evaluate(()=>{const p=__coven.state.player;p.skills.spellcraft=1000;p.inv.covenInk=1;p.mana=p.maxMana;__coven.cast(3);});
  assert.equal(await a.evaluate(()=>__coven.state.player.inv.covenInk??0),0,'Two-witch rite cast with a real player');

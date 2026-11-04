@@ -117,8 +117,10 @@ try{
   await page.keyboard.down('ShiftLeft');await page.keyboard.down('KeyD');
   const judder=await page.evaluate(()=>new Promise(done=>{const C=__coven,V=C.view,p=C.state.player,v=new V.camera.position.constructor(),fx=p.x+Math.cos(p.yaw)*40,fz=p.z+Math.sin(p.yaw)*40,fy=C.world.ground(fx,fz)+1,rec=[];
    const tick=now=>{v.set(fx,fy,fz).project(V.camera);rec.push([(v.x+1)*innerWidth/2,now]);if(rec.length<150){requestAnimationFrame(tick);return;}
-    const speed=[];for(let i=31;i<rec.length;i++){const dt=(rec[i][1]-rec[i-1][1])/1000;if(dt>0)speed.push((rec[i][0]-rec[i-1][0])/dt);}
-    let jump=0,mean=0;for(let i=0;i<speed.length;i++){mean+=Math.abs(speed[i]);if(i)jump+=Math.abs(speed[i]-speed[i-1]);}done(jump/(speed.length-1)/(mean/speed.length));};
+    // Frames over 90 ms are hitches (new ground loading), where the game caps a step at 0.1 s on purpose: not judder.
+    const speed=[];for(let i=31;i<rec.length;i++){const dt=(rec[i][1]-rec[i-1][1])/1000;speed.push(dt>0&&dt<.09?(rec[i][0]-rec[i-1][0])/dt:null);}
+    let jump=0,pairs=0,mean=0,n=0;for(let i=0;i<speed.length;i++){if(speed[i]===null)continue;mean+=Math.abs(speed[i]);n++;if(i&&speed[i-1]!==null){jump+=Math.abs(speed[i]-speed[i-1]);pairs++;}}
+    done(pairs?jump/pairs/(mean/n):1);};
    requestAnimationFrame(tick);}));
   await page.keyboard.up('KeyD');await page.keyboard.up('ShiftLeft');
   check('Sprinting sideways is smooth (no judder)',judder<.25,`judder ${(judder*100).toFixed(0)}%`);
