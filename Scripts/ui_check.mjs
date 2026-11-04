@@ -160,7 +160,12 @@ try{
   // Name plates: level and name over each creature near, coloured by danger; the one in her sights says it in words.
   await toOpen();
   // (Both rooted where they stand, so they stay in view however long the first frame showing them takes.)
-  await page.evaluate(()=>{const C=__coven,p=C.state.player;p.hp=p.maxHp=99999;C.aim(p.yaw,.1);C.spawn('wolf',p.x+Math.cos(p.yaw)*9,p.z+Math.sin(p.yaw)*9);C.creatures.at(-1).root=120;C.spawn('elderhorn',p.x+Math.cos(p.yaw+.3)*24,p.z+Math.sin(p.yaw+.3)*24);C.creatures.at(-1).root=120;});
+  // The elite goes on dry ground at her own height a little to one side, so the hills can't hide it below the view.
+  await page.evaluate(()=>{const C=__coven,p=C.state.player,g=C.world.ground(p.x,p.z);p.hp=p.maxHp=99999;C.aim(p.yaw,.1);
+   C.spawn('wolf',p.x+Math.cos(p.yaw)*9,p.z+Math.sin(p.yaw)*9);C.creatures.at(-1).root=120;
+   let at=null;for(const da of [.3,-.3,.15,-.15,.45,-.45,0])for(const d of [20,16,24,12]){const x=p.x+Math.cos(p.yaw+da)*d,z=p.z+Math.sin(p.yaw+da)*d,h=C.world.ground(x,z);if(!at&&h>1&&Math.abs(h-g)<2)at={x,z};}
+   at??={x:p.x+Math.cos(p.yaw+.3)*20,z:p.z+Math.sin(p.yaw+.3)*20};
+   C.spawn('elderhorn',at.x,at.z);C.creatures.at(-1).root=120;});
   const plated=await page.waitForFunction(()=>{const ps=[...document.querySelectorAll('#plates .plate')];
    return ps.some(e=>/12◆ Elderhorn/.test(e.textContent)&&e.classList.contains('deadly'))&&ps.some(e=>e.classList.contains('target')&&e.querySelector('em').textContent.length>2);},null,{timeout:25000}).then(()=>true,()=>false);
   check('Name plates show level, name and danger; the aimed one in words',plated,plated?'':JSON.stringify(await page.evaluate(()=>[...document.querySelectorAll('#plates .plate')].map(e=>`${e.className}: ${e.textContent}`))));
