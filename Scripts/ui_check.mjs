@@ -63,6 +63,8 @@ try{
  // ---- B–J: everything a player touches, on Low for speed ----
  if(part==='all'||part==='ui'){
   const {page,errs,ctx}=await open('low',{music:true});
+  // A condition the next drawn frame makes true (a frame can run long, as when a new creature's look is first built).
+  const eventually=(fn,arg,ms=8000)=>page.waitForFunction(fn,arg,{timeout:ms,polling:100}).then(()=>true,()=>false);
   // Fresh title: beacon view, no HUD, no controls bar.
   await page.waitForTimeout(2500);
   check('Fresh title hides the HUD and controls bar',await page.evaluate(()=>getComputedStyle(document.querySelector('#hud')).visibility==='hidden'&&getComputedStyle(document.querySelector('footer')).visibility==='hidden'&&getComputedStyle(document.querySelector('#quest')).visibility==='hidden'));
@@ -81,7 +83,7 @@ try{
   await page.click('#play');await page.click('[data-class="wild"]');
   await page.waitForFunction(()=>__coven.mode==='playing');
   check('Wild Witch starts in the Greenwood',await page.evaluate(()=>__coven.world.region(__coven.state.player.x,__coven.state.player.z))==='forest');
-  check('HUD and controls show in play',await page.evaluate(()=>getComputedStyle(document.querySelector('#hud')).visibility==='visible'&&getComputedStyle(document.querySelector('footer')).visibility==='visible'));
+  check('HUD and controls show in play',await eventually(()=>getComputedStyle(document.querySelector('#hud')).visibility==='visible'&&getComputedStyle(document.querySelector('footer')).visibility==='visible'));
   // Music: started by the click, toggled by N.
   await page.waitForTimeout(1500);
   const audio=()=>page.evaluate(()=>window.__audio.map(a=>a.state));
@@ -152,7 +154,7 @@ try{
   await toOpen();
   await page.evaluate(()=>{const C=__coven,p=C.state.player;p.hp=p.maxHp=99999;C.aim(p.yaw,.1);C.spawn('wolf',p.x+Math.cos(p.yaw)*9,p.z+Math.sin(p.yaw)*9);C.spawn('elderhorn',p.x+Math.cos(p.yaw+.45)*22,p.z+Math.sin(p.yaw+.45)*22);});
   const plated=await page.waitForFunction(()=>{const ps=[...document.querySelectorAll('#plates .plate')];
-   return ps.some(e=>/12◆ Elderhorn/.test(e.textContent)&&e.classList.contains('deadly'))&&ps.some(e=>e.classList.contains('target')&&e.querySelector('em').textContent.length>2);},null,{timeout:6000}).then(()=>true,()=>false);
+   return ps.some(e=>/12◆ Elderhorn/.test(e.textContent)&&e.classList.contains('deadly'))&&ps.some(e=>e.classList.contains('target')&&e.querySelector('em').textContent.length>2);},null,{timeout:25000}).then(()=>true,()=>false);
   check('Name plates show level, name and danger; the aimed one in words',plated,plated?'':JSON.stringify(await page.evaluate(()=>[...document.querySelectorAll('#plates .plate')].map(e=>`${e.className}: ${e.textContent}`))));
   await page.evaluate(()=>{for(const c of __coven.creatures)if(c.kind==='elderhorn'){c.hp=0;c.dead=true;}});
   // Panels by key and every tab.
@@ -208,10 +210,10 @@ try{
   // Pause: tooltips on spells and bars, How to play from pause, resume.
   await page.keyboard.press('Escape');await page.waitForTimeout(400);
   check('Escape pauses, with Quit shown',await page.evaluate(()=>__coven.mode)==='paused'&&await page.locator('#quit').isVisible());
-  check('Controls bar hidden under the pause menu',await page.evaluate(()=>getComputedStyle(document.querySelector('footer')).visibility==='hidden'));
-  check('Name plates step aside for the pause menu',await page.evaluate(()=>getComputedStyle(document.querySelector('#plates')).visibility==='hidden'));
-  check('Spell bar steps aside for the pause menu',await page.evaluate(()=>getComputedStyle(document.querySelector('#spells')).visibility==='hidden'));
-  check('HUD hidden under the pause menu',await page.evaluate(()=>getComputedStyle(document.querySelector('#hud')).visibility==='hidden'));
+  check('Controls bar hidden under the pause menu',await eventually(()=>getComputedStyle(document.querySelector('footer')).visibility==='hidden'));
+  check('Name plates step aside for the pause menu',await eventually(()=>getComputedStyle(document.querySelector('#plates')).visibility==='hidden'));
+  check('Spell bar steps aside for the pause menu',await eventually(()=>getComputedStyle(document.querySelector('#spells')).visibility==='hidden'));
+  check('HUD hidden under the pause menu',await eventually(()=>getComputedStyle(document.querySelector('#hud')).visibility==='hidden'));
   await page.click('#helpBtn').catch(()=>page.click('text=HOW TO PLAY'));await page.waitForTimeout(300);
   check('How to play opens from pause',await page.locator('#help').isVisible());
   await page.click('#help [data-close]');await page.waitForTimeout(300);

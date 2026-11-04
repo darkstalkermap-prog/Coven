@@ -20,6 +20,7 @@ let browser;
 try{
  browser=await launch();
  const errors=[];
+ const front=async page=>{await page.bringToFront();if(await page.evaluate(()=>__coven.mode)==='paused')await page.click('#play');await page.waitForTimeout(300);};
  // Each player's page, on Low graphics: this tests the network, and three games share the machine's CPU.
  async function open(viewport={width:1000,height:700}){
   const page=await (await browser.newContext({viewport})).newPage();
@@ -54,6 +55,9 @@ try{
  await host.waitForFunction(()=>/COVEN 2\/4/.test(document.querySelector('#covenList small').textContent),null,poll);
  await host.evaluate(()=>{const p=__coven.state.player;__coven.spawn('wolf',p.x,p.z+60);});
  await guest.waitForFunction(()=>__coven.creatures.some(c=>c.remote&&c.kind==='wolf'),null,poll);
+ // With windows on one screen (Firefox runs in one), the window in front pauses the other's game as any
+ // switched-away game pauses; bring this one forward and carry on before typing.
+ await front(guest);
  await guest.keyboard.press('Enter');await guest.keyboard.type('Found you!');await guest.keyboard.press('Enter');
  await host.waitForFunction(()=>document.querySelector('#chatLog').textContent.includes('Ivy: Found you!'),null,poll);
  const node=await guest.evaluate(()=>{const p=__coven.state.player,n=__coven.view.nodesNear(p.x,p.z,200)[0];__coven.state.harvested[n.id]=__coven.state.clock+600;__coven.view.hideNode(n.id);__coven.net.send({type:'harvest',node:n.id,seconds:600});return n.id;});

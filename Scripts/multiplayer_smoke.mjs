@@ -10,6 +10,7 @@ let browser;
 try{
  browser=await launch();
  const errors=[];
+ const front=async page=>{await page.bringToFront();if(await page.evaluate(()=>__coven.mode)==='paused')await page.click('#play');await page.waitForTimeout(300);};
  async function witch(name,cls){
   const page=await (await browser.newContext({viewport:{width:1000,height:700}})).newPage();
   page.setDefaultTimeout(60000);
@@ -48,6 +49,9 @@ try{
  await a.waitForFunction(()=>[...__coven.villages.values()].some(v=>v.list.some(x=>x.type==='heart')));
 
  // Chat.
+ // With windows on one screen (Firefox runs in one), the window in front pauses the other's game as any
+ // switched-away game pauses; bring this one forward and carry on before typing.
+ await front(a);
  await a.keyboard.press('Enter');await a.keyboard.type('Blessed be');await a.keyboard.press('Enter');
  await b.waitForFunction(()=>document.querySelector('#chatLog').textContent.includes('Agnes: Blessed be'));
 
