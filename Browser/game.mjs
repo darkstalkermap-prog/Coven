@@ -1156,17 +1156,30 @@ function closeMenuHelp() { $('#help').classList.add('hidden'); mode = state && $
 document.querySelector('#help [data-close]').onclick = () => (mode === 'help-menu' ? closeMenuHelp() : play());
 
 // ---------- speed test ----------
-// Walks the same route at each graphics level and measures the frame rate, so a player (or a friend) can see what
-// their computer manages and choose a level. Leaves any game as it was. ?benchmark in the address starts it
-// (?benchmark=quick for a short run, used by the tests).
+// Plays four set scenes at each graphics level and measures the frame rate, so a player (or a friend) can see what
+// their computer manages where it matters, and choose a level: a walk through the Springvale meadow, a sprint
+// through the Greenwood, a fast broom flight over the hills (new ground loading all the way) and a fight (a pack
+// and an elite round her, three sisters casting, bolts and spell rings flying). A level's verdict is its worst
+// scene's. Leaves any game as it was. ?benchmark in the address starts it (?benchmark=quick: a short run, for tests).
 const BENCH_LEVELS = ['low', 'medium', 'high', 'ultra'];
 const LEVEL_NAMES = { low: 'Low', medium: 'Medium', high: 'High', ultra: 'Ultra' };
+const BENCH_SCENES = [['walk', 'Walk'], ['run', 'Sprint'], ['fly', 'Flight'], ['fight', 'Combat']];
+const verdictOf = (avg, low) => avg >= 55 && low >= 40 ? 'Smooth' : avg >= 30 && low >= 20 ? 'Playable' : 'Slow';
 let bench = null, benchReport = null;
 function startBench(quick = false) {
   if (bench) return;
-  const h = world.hearthOf('meadow'), cx = h.x + 40, cz = h.z + 40;
-  bench = { quick, i: -1, prevMode: mode === 'paused' ? 'paused' : state ? 'paused' : 'menu', cx, cz, r: 45, a: 0, player: { x: cx, y: 0, z: cz, yaw: 0 }, results: [],
-    elders: ELDERS.filter(e => Math.hypot(e.x - cx, e.z - cz) < 300) };
+  const meadow = world.hearthOf('meadow'), forest = world.hearthOf('forest');
+  const toCrown = h => { const d = Math.hypot(CROWN.x - h.x, CROWN.z - h.z); return { x: (CROWN.x - h.x) / d, z: (CROWN.z - h.z) / d }; };
+  const fight = { x: meadow.x + 40, z: meadow.z + 40 };
+  // The fight's cast: six wolves and an elite circling her, three sisters round about.
+  const foes = [...Array(6)].map((_, k) => ({ id: `bench-wolf-${k}`, kind: 'wolf', k, r: 7 + (k % 3) * 2, hp: 50, maxHp: 60, hurt: 0, walk: 0, yaw: 0, x: 0, y: 0, z: 0 }));
+  foes.push({ id: 'bench-elite', kind: 'elderhorn', k: 6, r: 12, hp: 1400, maxHp: 1674, hurt: 0, walk: 0, yaw: 0, x: 0, y: 0, z: 0 });
+  const sisters = ['bog', 'hex', 'wild'].map((cls, k) => ({ id: `bench-sister-${cls}`, ally: 'witch', cls, x: fight.x + Math.cos(k * 2.1) * 3, z: fight.z + Math.sin(k * 2.1) * 3, y: 0, yaw: 0, walk: 0 }));
+  for (const s of sisters) s.y = world.ground(s.x, s.z);
+  bench = { quick, level: -1, scene: 0, prevMode: mode === 'paused' ? 'paused' : state ? 'paused' : 'menu', results: [],
+    meadow, run: { x: forest.x + 40, z: forest.z + 20, dir: toCrown(forest) }, fly: { x: meadow.x + 60, z: meadow.z + 60, dir: toCrown(meadow) }, fight, foes, sisters,
+    player: { x: 0, y: 0, z: 0, yaw: 0 }, bolts: [], nextRing: 0, nextBolt: 0, swing: 0,
+    elders: ELDERS.filter(e => Math.hypot(e.x - meadow.x, e.z - meadow.z) < 400) };
   mode = 'bench'; keys.clear(); jumpTap = false; releaseMouse();
   for (const id of ['#overlay', '#help', '#bench', '#pack', '#map', '#classes']) $(id).classList.add('hidden');
   $('#benchBar').classList.remove('hidden');
@@ -1175,33 +1188,76 @@ function startBench(quick = false) {
 }
 function nextBenchLevel(now) {
   const b = bench;
-  if (++b.i >= BENCH_LEVELS.length) { endBench(false); return; }
-  view.setQuality(BENCH_LEVELS[b.i]);
-  Object.assign(b, { phase: 'warm', t0: now, frames: [], recent: [] });
+  if (++b.level >= BENCH_LEVELS.length) { endBench(false); return; }
+  view.setQuality(BENCH_LEVELS[b.level]);
+  b.results.push({ level: BENCH_LEVELS[b.level], scenes: {} });
+  b.scene = -1;
+  nextBenchScene(now);
+}
+function nextBenchScene(now) {
+  const b = bench;
+  if (++b.scene >= BENCH_SCENES.length) { nextBenchLevel(now); return; }
+  // A new level settles longer (shaders to compile); a new scene only long enough for its ground to load.
+  Object.assign(b, { phase: 'warm', t0: now, start: now, frames: [], recent: [], bolts: [] });
+}
+// Where she is, how she moves and what is about, `t` seconds into a scene.
+function benchScene(id, t, now) {
+  const b = bench, p = b.player, empty = { creatures: [], allies: [], projectiles: [] };
+  if (id === 'walk') {
+    const a = t * 5 / 45, cx = b.meadow.x + 40, cz = b.meadow.z + 40;
+    Object.assign(p, { x: cx + Math.cos(a) * 45, z: cz + Math.sin(a) * 45, yaw: a + Math.PI / 2 }); p.y = world.ground(p.x, p.z);
+    return { ...empty, moving: true };
+  }
+  if (id === 'run') {
+    const r = b.run, d = t * 9;
+    Object.assign(p, { x: r.x + r.dir.x * d, z: r.z + r.dir.z * d, yaw: Math.atan2(r.dir.z, r.dir.x) }); p.y = world.ground(p.x, p.z);
+    return { ...empty, moving: true, sprinting: true };
+  }
+  if (id === 'fly') {
+    const f = b.fly, d = t * 15;
+    Object.assign(p, { x: f.x + f.dir.x * d, z: f.z + f.dir.z * d, yaw: Math.atan2(f.dir.z, f.dir.x) }); p.y = Math.max(world.ground(p.x, p.z), 0) + 22;
+    return { ...empty, moving: true, mounted: true, flying: true };
+  }
+  // The fight: she stands her ground, striking, while the pack circles and the sisters cast.
+  const c = b.fight;
+  Object.assign(p, { x: c.x, z: c.z, yaw: t * .4 }); p.y = world.ground(c.x, c.z);
+  for (const f of b.foes) {
+    const a = t * (f.kind === 'wolf' ? .9 : .35) + f.k * .9;
+    f.x = c.x + Math.cos(a) * f.r; f.z = c.z + Math.sin(a) * f.r; f.y = world.ground(f.x, f.z); f.yaw = a + Math.PI / 2; f.walk = t * 6; f.hurt = Math.max(0, f.hurt - .05);
+  }
+  for (const s of b.sisters) { const f = b.foes[(Math.floor(t) + s.cls.length) % b.foes.length]; s.yaw = Math.atan2(f.z - s.z, f.x - s.x); }
+  b.swing = (t % .6) < .45 ? 1 - (t % .6) / .45 : 0;
+  if (t >= b.nextBolt) {
+    b.nextBolt = t + .25;
+    const s = b.sisters[Math.floor(t * 4) % 3], f = b.foes[Math.floor(t * 7) % b.foes.length];
+    b.bolts.push({ id: `bench-bolt-${Math.round(t * 1000)}`, color: SPELLS[CLASSES[s.cls].spells[0]].color, from: s, to: f, born: t });
+  }
+  b.bolts = b.bolts.filter(o => t - o.born < .6);
+  const projectiles = b.bolts.map(o => { const k = (t - o.born) / .6; return { id: o.id, color: o.color, x: o.from.x + (o.to.x - o.from.x) * k, y: o.from.y + 1.6 + (o.to.y + .8 - o.from.y - 1.6) * k, z: o.from.z + (o.to.z - o.from.z) * k }; });
+  if (t >= b.nextRing) { b.nextRing = t + .8; const f = b.foes[Math.floor(t) % b.foes.length]; f.hurt = 3; view.ring(f.x, f.y, f.z, 5, '#ffd86a'); }
+  return { creatures: b.foes, allies: b.sisters, projectiles, moving: false, swing: b.swing };
 }
 function benchFrame(now, raw, dt) {
-  const b = bench, level = BENCH_LEVELS[b.i], p = b.player, t = (now - b.t0) / 1000;
-  // A circle through the Springvale meadow at walking pace: blossom trees, grass, the hearth and its elder.
-  b.a += dt * 5 / b.r;
-  p.x = b.cx + Math.cos(b.a) * b.r; p.z = b.cz + Math.sin(b.a) * b.r; p.y = world.ground(p.x, p.z); p.yaw = b.a + Math.PI / 2;
-  view.stream(p.x, p.z, 2);
-  view.syncWorld({ creatures: [], allies: [], boss: null, buildings: [], projectiles: [], elders: b.elders, now: now / 1000 });
-  view.render({ player: p, yaw: p.yaw, pitch: .18, dayTime: .42, now: now / 1000, dt, swing: 0, toolName: 'fists', lights: hearthFires(), moving: true, sight: false });
-  const warm = b.quick ? .5 : 2.5, measure = b.quick ? 1 : 6;
+  const b = bench, level = BENCH_LEVELS[b.level], [id, name] = BENCH_SCENES[b.scene], t = (now - b.start) / 1000, p = b.player;
+  const s = benchScene(id, t, now);
+  view.stream(p.x, p.z, 1); // as in play: one piece of new ground a frame
+  view.syncWorld({ creatures: s.creatures, allies: s.allies, boss: null, buildings: [], projectiles: s.projectiles, elders: b.elders, now: now / 1000 });
+  view.render({ player: p, yaw: p.yaw, pitch: id === 'fly' ? .3 : .18, dayTime: .42, now: now / 1000, dt, swing: s.swing ?? 0, swingKind: 'strike', toolName: 'fists', lights: hearthFires(), moving: s.moving, sprinting: !!s.sprinting, mounted: !!s.mounted, flying: !!s.flying, sight: false });
+  const first = b.scene === 0, warm = b.quick ? .3 : first ? 2.5 : 1.2, measure = b.quick ? .6 : 4, phaseT = (now - b.t0) / 1000;
   if (b.phase === 'warm') {
-    // Settle first: new ground to build and shaders to compile make the first frames slow.
+    // Settle first: new ground to build and (at a new level) shaders to compile make the first frames slow.
     b.recent.push(raw); if (b.recent.length > 10) b.recent.shift();
-    if (t > warm && ((b.recent.length === 10 && Math.max(...b.recent) < .25) || t > warm + (b.quick ? 3 : 8))) Object.assign(b, { phase: 'measure', t0: now, frames: [] });
+    if (phaseT > warm && ((b.recent.length === 10 && Math.max(...b.recent) < .25) || phaseT > warm + (b.quick ? 2 : first ? 8 : 3))) Object.assign(b, { phase: 'measure', t0: now, frames: [] });
   } else {
     b.frames.push(raw);
-    if (t >= measure) {
+    if (phaseT >= measure) {
       const f = [...b.frames].sort((x, y) => x - y), avg = f.length / f.reduce((sum, x) => sum + x, 0), low = 1 / f[Math.min(f.length - 1, Math.floor(f.length * .99))];
-      b.results.push({ level, avg, low, verdict: avg >= 55 && low >= 40 ? 'Smooth' : avg >= 30 && low >= 20 ? 'Playable' : 'Slow' });
-      nextBenchLevel(now);
+      b.results.at(-1).scenes[id] = { avg, low };
+      nextBenchScene(now);
       return;
     }
   }
-  put('#benchBar', 'textContent', `SPEED TEST · ${LEVEL_NAMES[level]} (${b.i + 1} of ${BENCH_LEVELS.length}) · ${b.phase === 'warm' ? 'getting ready' : `measuring, ${Math.max(0, Math.ceil(measure - t))} s`} · Esc stops`);
+  put('#benchBar', 'textContent', `SPEED TEST · ${LEVEL_NAMES[level]} (${b.level + 1} of ${BENCH_LEVELS.length}) · ${name} · ${b.phase === 'warm' ? 'getting ready' : `measuring, ${Math.max(0, Math.ceil(measure - phaseT))} s`} · Esc stops`);
 }
 function endBench(stopped) {
   const b = bench;
@@ -1210,8 +1266,13 @@ function endBench(stopped) {
   $('#benchBar').classList.add('hidden');
   mode = b.prevMode;
   $('#overlay').classList.remove('hidden');
-  if (stopped) toast('Speed test stopped.');
-  else showBenchResults(b.results);
+  if (stopped) { toast('Speed test stopped.'); return; }
+  // Each level by its worst scene.
+  for (const r of b.results) {
+    const all = Object.values(r.scenes);
+    r.avg = Math.min(...all.map(x => x.avg)); r.low = Math.min(...all.map(x => x.low)); r.verdict = verdictOf(r.avg, r.low);
+  }
+  showBenchResults(b.results);
 }
 const gpuName = () => {
   const gl = view.renderer.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info');
@@ -1225,16 +1286,18 @@ const browserName = () => {
 function showBenchResults(results) {
   const rev = [...results].reverse(), best = rev.find(r => r.verdict === 'Smooth') ?? rev.find(r => r.verdict === 'Playable') ?? results[0];
   const info = `${gpuName()} · window ${innerWidth}×${innerHeight} at ${devicePixelRatio}× · ${browserName()}`;
-  const text = [`Coven speed test, ${new Date().toISOString().slice(0, 10)}`, info,
-    ...results.map(r => `${LEVEL_NAMES[r.level].padEnd(7)}${r.avg.toFixed(0).padStart(5)} fps average · slowest 1%${r.low.toFixed(0).padStart(5)} fps · ${r.verdict}`),
+  const cell = x => x ? `${x.avg.toFixed(0)} · ${x.low.toFixed(0)}` : '–';
+  const text = [`Coven speed test, ${new Date().toISOString().slice(0, 10)} (fps: average · slowest 1%)`, info,
+    `${'Level'.padEnd(8)}${BENCH_SCENES.map(([, n]) => n.padStart(11)).join('')}`,
+    ...results.map(r => `${LEVEL_NAMES[r.level].padEnd(8)}${BENCH_SCENES.map(([id]) => cell(r.scenes[id]).padStart(11)).join('')}   ${r.verdict}`),
     `Recommended: ${LEVEL_NAMES[best.level]}`].join('\n');
   benchReport = { text, best: best.level, results };
-  $('#benchBody').innerHTML = `<p class="hint">Coven walked the same route through Springvale at each graphics level on this computer.</p>
-    <table class="benchTable"><tr><th>Level</th><th>Average</th><th>Slowest 1%</th><th></th></tr>${results.map(r => `<tr class="${r.verdict.toLowerCase()}"><td>${LEVEL_NAMES[r.level]}</td><td>${r.avg.toFixed(0)} fps</td><td>${r.low.toFixed(0)} fps</td><td>${r.verdict}</td></tr>`).join('')}</table>
-    <p>Recommended: <b>${LEVEL_NAMES[best.level]}</b>. <span class="hint">Smooth: 55 frames a second or more, rarely below 40. Playable: 30, rarely below 20.</span></p>
+  $('#benchBody').innerHTML = `<p class="hint">Coven played the same four scenes at each graphics level on this computer: a walk, a sprint through the forest, a fast broom flight and a fight. Each cell: average frames a second · slowest 1%.</p>
+    <table class="benchTable"><tr><th>Level</th>${BENCH_SCENES.map(([, n]) => `<th>${n}</th>`).join('')}<th></th></tr>${results.map(r => `<tr class="${r.verdict.toLowerCase()}"><td>${LEVEL_NAMES[r.level]}</td>${BENCH_SCENES.map(([id]) => `<td>${cell(r.scenes[id])}</td>`).join('')}<td>${r.verdict}</td></tr>`).join('')}</table>
+    <p>Recommended: <b>${LEVEL_NAMES[best.level]}</b>. <span class="hint">A level is judged by its worst scene. Smooth: 55 frames a second or more, rarely below 40. Playable: 30, rarely below 20.</span></p>
     <p class="hint">${esc(info)}</p>
     <div class="benchButtons"><button id="benchUse">USE ${LEVEL_NAMES[best.level].toUpperCase()}</button><button id="benchCopy" class="ghost">COPY RESULTS</button></div>
-    <textarea id="benchText" class="hidden" readonly rows="7">${esc(text)}</textarea>`;
+    <textarea id="benchText" class="hidden" readonly rows="8">${esc(text)}</textarea>`;
   $('#bench').classList.remove('hidden');
   $('#benchUse').onclick = () => { setGfx(best.level); closeBench(); toast(`Graphics set to ${LEVEL_NAMES[best.level]}.`); };
   $('#benchCopy').onclick = () => {
