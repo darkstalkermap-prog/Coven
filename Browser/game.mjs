@@ -1023,7 +1023,7 @@ $('#classBack').onclick = () => { $('#classes').classList.add('hidden'); $('#ove
 $('#play').onclick = () => state ? play() : chooseClass();
 $('#newGame').onclick = () => { if (confirm('Abandon this life and start again? Your saved progress will be lost.')) chooseClass(); };
 // Quit: save, leave any online game, and go back to the title screen, where Continue picks up where you left off.
-$('#quit').onclick = () => { saveState(); net.close(); music.setEnabled(false); location.reload(); };
+$('#quit').onclick = () => { saveState(); net.close(); music.stop(); location.reload(); };
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = play);
 addEventListener('resize', () => view.resize());
 addEventListener('blur', () => { if (mode === 'playing') pause(); });

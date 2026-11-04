@@ -23,7 +23,7 @@ export class Music {
 
   // Call from a click. Safe to call again.
   start() {
-    if (this.ctx || !this.enabled) { this.ctx?.resume?.(); return; }
+    if (this.ctx || !this.enabled) { this.ctx?.resume?.()?.catch?.(() => {}); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     this.build(new AC());
@@ -64,7 +64,13 @@ export class Music {
   setEnabled(on) {
     this.enabled = on;
     if (!this.ctx) { if (on) this.start(); return; }
-    if (on) this.ctx.resume(); else this.ctx.suspend();
+    // (Either can be refused while the page is leaving, as it is after Quit: nothing to do then.)
+    (on ? this.ctx.resume() : this.ctx.suspend())?.catch?.(() => {});
+  }
+  // Silence for good (leaving the page): no more notes scheduled, the sound device let go.
+  stop() {
+    clearInterval(this.timer); this.timer = null;
+    this.ctx?.close?.()?.catch?.(() => {}); this.ctx = null;
   }
   // 'day', 'night' or 'battle'. Takes effect at the next bar.
   setMood(mood) { if (MOODS[mood]) this.mood = mood; }
