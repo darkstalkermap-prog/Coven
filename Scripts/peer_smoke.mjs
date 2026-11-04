@@ -53,6 +53,7 @@ try{
  const spot=await host.evaluate(()=>({x:__coven.state.player.x,z:__coven.state.player.z}));
  await guest.evaluate(s=>{const p=__coven.state.player;p.x=s.x+3;p.z=s.z;},spot);
  await host.waitForFunction(()=>/COVEN 2\/4/.test(document.querySelector('#covenList small').textContent),null,poll);
+ await front(host); // the host runs the creatures, so its game must be going
  await host.evaluate(()=>{const p=__coven.state.player;__coven.spawn('wolf',p.x,p.z+60);});
  await guest.waitForFunction(()=>__coven.creatures.some(c=>c.remote&&c.kind==='wolf'),null,poll);
  // With windows on one screen (Firefox runs in one), the window in front pauses the other's game as any
