@@ -81,7 +81,8 @@ jobs:
           # Firefox needs a window (on a virtual display) to get WebGL without a graphics card.
           RUN=; if [ "$BROWSER" = firefox ]; then export HEADED=1; RUN="xvfb-run -a"; fi
           # On failure, surface the test's error lines as annotations so they show in the run summary.
-          $RUN npm run test:browser 2>&1 | tee browser.log || { grep -E "Error|assert|expected|actual|Timeout|  at |PASS|✗|FAILED|checks passed|events:" browser.log | head -40 | sed "s/^/::error::${{ matrix.browser }}: /"; exit 1; }
+          # Each browser gets 35 minutes; on failure (or running out of time) the failed checks and the last lines show.
+          timeout 35m $RUN npm run test:browser 2>&1 | tee browser.log || { { grep -E "Error|assert|expected|actual|Timeout|  at |PASS|✗|FAILED|checks passed|events:" browser.log | head -40; echo "--- last lines:"; tail -12 browser.log; } | sed "s/^/::error::${{ matrix.browser }}: /"; exit 1; }
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

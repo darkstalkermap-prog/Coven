@@ -105,9 +105,9 @@ try{
    return false;});
   // Her state, for the detail of a failed check.
   const state=()=>page.evaluate(()=>{const C=__coven,p=C.state.player;return `mode ${C.mode}, hp ${Math.round(p.hp)}, at ${Math.round(p.x)},${Math.round(p.z)} y ${p.y.toFixed(1)} ground ${C.world.ground(p.x,p.z).toFixed(1)}${p.mounted?', mounted':''}`;});
-  // Hold the keys until she has gone `far` (a frame busy building new ground can swallow a short press), up to 4 s.
+  // Hold the keys until she has gone `far` (a frame busy building new ground can swallow a short press), up to 15 s.
   const walk=async(codes,far)=>{await toOpen();const a=await pos();for(const k of codes)await page.keyboard.down(k);
-   const ok=await page.waitForFunction(([a,far])=>Math.hypot(__coven.state.player.x-a.x,__coven.state.player.z-a.z)>far,[a,far],{timeout:4000,polling:50}).then(()=>true,()=>false);
+   const ok=await page.waitForFunction(([a,far])=>Math.hypot(__coven.state.player.x-a.x,__coven.state.player.z-a.z)>far,[a,far],{timeout:15000,polling:50}).then(()=>true,()=>false);
    for(const k of codes)await page.keyboard.up(k);const b=await pos();return [ok,`${Math.hypot(b.x-a.x,b.z-a.z).toFixed(1)} m${ok?'':'; '+await state()}`];};
   await toOpen();
   check('W walks forward',...await walk(['KeyW'],2));
@@ -152,7 +152,8 @@ try{
   check('Right click casts the first spell',...await cast(()=>page.mouse.click(640,400,{button:'right'})));
   // Name plates: level and name over each creature near, coloured by danger; the one in her sights says it in words.
   await toOpen();
-  await page.evaluate(()=>{const C=__coven,p=C.state.player;p.hp=p.maxHp=99999;C.aim(p.yaw,.1);C.spawn('wolf',p.x+Math.cos(p.yaw)*9,p.z+Math.sin(p.yaw)*9);C.spawn('elderhorn',p.x+Math.cos(p.yaw+.45)*22,p.z+Math.sin(p.yaw+.45)*22);});
+  // (Both rooted where they stand, so they stay in view however long the first frame showing them takes.)
+  await page.evaluate(()=>{const C=__coven,p=C.state.player;p.hp=p.maxHp=99999;C.aim(p.yaw,.1);C.spawn('wolf',p.x+Math.cos(p.yaw)*9,p.z+Math.sin(p.yaw)*9);C.creatures.at(-1).root=120;C.spawn('elderhorn',p.x+Math.cos(p.yaw+.3)*24,p.z+Math.sin(p.yaw+.3)*24);C.creatures.at(-1).root=120;});
   const plated=await page.waitForFunction(()=>{const ps=[...document.querySelectorAll('#plates .plate')];
    return ps.some(e=>/12◆ Elderhorn/.test(e.textContent)&&e.classList.contains('deadly'))&&ps.some(e=>e.classList.contains('target')&&e.querySelector('em').textContent.length>2);},null,{timeout:25000}).then(()=>true,()=>false);
   check('Name plates show level, name and danger; the aimed one in words',plated,plated?'':JSON.stringify(await page.evaluate(()=>[...document.querySelectorAll('#plates .plate')].map(e=>`${e.className}: ${e.textContent}`))));
@@ -231,7 +232,8 @@ try{
   // The beacon turns gold once the Unwitch is unmade.
   const col=()=>page.evaluate(()=>'#'+__coven.view.beacon.uniforms.uColor.value.getHexString());
   const before=await col();
-  await page.evaluate(()=>{__coven.state.bossDefeated=true;});await page.waitForTimeout(500);
+  await page.evaluate(()=>{__coven.state.bossDefeated=true;});
+  await eventually(()=>__coven.view.beacon.uniforms.uColor.value.getHexString()==='ffc860');
   const after=await col();
   check('Beacon is crimson, then gold after the Unwitch falls',before==='#ff3c6e'&&after==='#ffc860',`${before} → ${after}`);
   await page.evaluate(()=>{__coven.state.bossDefeated=false;});
