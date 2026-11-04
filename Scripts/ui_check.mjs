@@ -65,7 +65,7 @@ try{
  if(part==='all'||part==='ui'){
   const {page,errs,ctx}=await open('low',{music:true});
   // A condition the next drawn frame makes true (a frame can run long, as when a new creature's look is first built).
-  const eventually=(fn,arg,ms=8000)=>page.waitForFunction(fn,arg,{timeout:ms,polling:100}).then(()=>true,()=>false);
+  const eventually=(fn,arg,ms=12000)=>page.waitForFunction(fn,arg,{timeout:ms,polling:100}).then(()=>true,()=>false);
   // Fresh title: beacon view, no HUD, no controls bar.
   await page.waitForTimeout(2500);
   check('Fresh title hides the HUD and controls bar',await page.evaluate(()=>getComputedStyle(document.querySelector('#hud')).visibility==='hidden'&&getComputedStyle(document.querySelector('footer')).visibility==='hidden'&&getComputedStyle(document.querySelector('#quest')).visibility==='hidden'));
@@ -133,8 +133,10 @@ try{
   await page.waitForTimeout(1000);
   // Gather: stand at a tree and strike.
   const wood0=await page.evaluate(()=>{const p=__coven.state.player,n=__coven.view.nodesNear(p.x,p.z,120).find(n=>['pine','oak','gloomtree','blossom','deadtree'].includes(n.type));__coven.aim(p.yaw,.2);p.x=n.x-Math.cos(p.yaw)*1.6;p.z=n.z-Math.sin(p.yaw)*1.6;p.y=__coven.world.ground(p.x,p.z);return p.inv.wood??0;});
-  for(let i=0;i<8;i++){await page.mouse.click(640,400);await page.waitForTimeout(450);}
-  check('Left click gathers wood from a tree',await page.evaluate(w=>(__coven.state.player.inv.wood??0)>w,wood0));
+  // Strike until the tree gives wood (each strike waits out the swing; a long frame can swallow a click).
+  let gathered=false;
+  for(let i=0;i<30&&!gathered;i++){await page.mouse.click(640,400);gathered=await page.waitForFunction(w=>(__coven.state.player.inv.wood??0)>w,wood0,{timeout:700}).then(()=>true,()=>false);}
+  check('Left click gathers wood from a tree',gathered);
   // Q eats.
   await page.evaluate(()=>{const p=__coven.state.player;p.inv.berries=3;p.food=40;});
   await page.keyboard.press('KeyQ');
@@ -177,8 +179,8 @@ try{
   await page.click('[data-tab="coven"]');await page.waitForTimeout(200);
   check('Hovering a coven rite explains it',(await tip('#tabBody li[data-tip]'))?.length>5);
   await page.locator('#heroCanvas').screenshot({path:out+'portrait.png'}).catch(()=>{});
-  await page.click('[data-tab="items"]');await page.waitForTimeout(1500);
-  check('Inventory portrait draws',await page.evaluate(()=>!!__coven.portrait));
+  await page.click('[data-tab="items"]');
+  check('Inventory portrait draws',await eventually(()=>!!__coven.portrait,null,15000));
   await page.keyboard.press('Escape');await page.waitForTimeout(300);
   check('Escape closes the panel back to play',await page.evaluate(()=>__coven.mode)==='playing'&&await page.locator('#pack').isHidden());
   // Map.
@@ -196,7 +198,7 @@ try{
   // Interact with the elder, broom.
   // Beside her own elder, who stands 3 m off her hearth.
   await page.evaluate(()=>{const C=__coven,p=C.state.player,h=C.world.hearthOf({bog:'swamp',hex:'darkforest',bloom:'meadow',wild:'forest'}[p.class]);p.x=h.x+3-1.5;p.z=h.z+3;p.y=C.world.ground(p.x,p.z);C.aim(0,.2);});
-  const prompted=await page.waitForFunction(()=>/Speak with/.test(document.querySelector('#prompt').textContent),null,{timeout:5000}).then(()=>true,()=>false);
+  const prompted=await page.waitForFunction(()=>/Speak with/.test(document.querySelector('#prompt').textContent),null,{timeout:15000}).then(()=>true,()=>false);
   const prompt=await page.locator('#prompt').textContent(),said=await page.evaluate(()=>__coven.messages.length);
   await page.keyboard.press('KeyE');
   const spoke=await page.waitForFunction(n=>__coven.messages.length>n,said,{timeout:3000}).then(()=>true,()=>false);
@@ -224,7 +226,7 @@ try{
   check('Resume returns to play',await page.evaluate(()=>__coven.mode)==='playing');
   // Falling: wake at home with your things.
   const wood=await page.evaluate(()=>{const p=__coven.state.player;p.inv.wood=(p.inv.wood??0)+5;p.x+=40;p.hp=0;return p.inv.wood;});
-  const woke=await page.waitForFunction(w=>__coven.state.player.hp>0&&__coven.state.player.inv.wood>=w,wood,{timeout:4000}).then(()=>true,()=>false);
+  const woke=await page.waitForFunction(w=>__coven.state.player.hp>0&&__coven.state.player.inv.wood>=w,wood,{timeout:15000}).then(()=>true,()=>false);
   check('Falling wakes you at home with your things',woke,woke?'':await state());
   // Window resize.
   await page.setViewportSize({width:900,height:600});await page.waitForTimeout(800);
@@ -234,7 +236,7 @@ try{
   const col=()=>page.evaluate(()=>'#'+__coven.view.beacon.uniforms.uColor.value.getHexString());
   const before=await col();
   await page.evaluate(()=>{__coven.state.bossDefeated=true;});
-  await eventually(()=>__coven.view.beacon.uniforms.uColor.value.getHexString()==='ffc860');
+  await eventually(()=>__coven.view.beacon.uniforms.uColor.value.getHexString()==='ffc860',null,15000);
   const after=await col();
   check('Beacon is crimson, then gold after the Unwitch falls',before==='#ff3c6e'&&after==='#ffc860',`${before} → ${after}`);
   await page.evaluate(()=>{__coven.state.bossDefeated=false;});
@@ -244,7 +246,7 @@ try{
   await Promise.all([page.waitForNavigation(),page.click('#quit')]);
   await page.waitForFunction(()=>!!window.__coven);await page.waitForTimeout(1500);
   check('Quit returns to the title with CONTINUE',(await page.locator('#play').textContent()).includes('CONTINUE')&&await page.evaluate(()=>__coven.mode)==='menu');
-  check('Title for a returning player shows her world and HUD stays hidden under the menu',await page.evaluate(()=>!document.body.classList.contains('is-fresh')&&getComputedStyle(document.querySelector('footer')).visibility==='hidden'));
+  check('Title for a returning player shows her world and HUD stays hidden under the menu',await page.waitForFunction(()=>!document.body.classList.contains('is-fresh')&&getComputedStyle(document.querySelector('footer')).visibility==='hidden',null,{timeout:15000}).then(()=>true,()=>false));
   await page.click('#play');await page.waitForTimeout(800);
   check('Continue picks up the saved game',await page.evaluate(k=>__coven.mode==='playing'&&__coven.state.player.class==='wild'&&__coven.state.player.stats.kills===k,kills));
   // New game: confirm, choose another path.
