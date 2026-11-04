@@ -169,5 +169,5 @@ try{
  assert.equal(await page.evaluate(()=>__coven.mode),'menu','Quit returns to the title screen');
  assert.equal(await page.evaluate(()=>__coven.state.player.stats.kills),kills,'Quit saved the game');
  assert.deepEqual(errors,[],'No browser errors');
- console.log(`PASS (${NAME}): WebGL 2, Pages subpath, class choice, homeland start, walking, spell bar, village building, alchemy, solo casting with materials, equipment slots, broom riding, Skyward Charm and flight, human village alarm, glamour and trade, soul capture, Wyrd Titan, hunting and loot, map, boss ward and Grand Rite, spell descriptions, quit and continue, no browser errors.`);
+ console.log(`PASS (${NAME}, ${Math.round(process.uptime())} s): WebGL 2, Pages subpath, class choice, homeland start, walking, spell bar, village building, alchemy, solo casting with materials, equipment slots, broom riding, Skyward Charm and flight, human village alarm, glamour and trade, soul capture, Wyrd Titan, hunting and loot, map, boss ward and Grand Rite, spell descriptions, quit and continue, no browser errors.`);
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

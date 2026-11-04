@@ -38,6 +38,7 @@ async function open(quality,{viewport={width:1280,height:800},music=false,keep,p
 }
 const fps=page=>page.evaluate(()=>new Promise(r=>{let n=0;const t0=performance.now();const f=()=>{n++;if(performance.now()-t0<4000)requestAnimationFrame(f);else r(n/((performance.now()-t0)/1000));};requestAnimationFrame(f);}));
 
+let crashed=null;
 try{
  // ---- A: every graphics level starts, plays and draws without errors ----
  if(part==='all'||part==='gfx')for(const q of process.env.UI_CHECK_ALL_GFX?['low','medium','high','ultra','auto']:['low','medium']){
@@ -88,7 +89,7 @@ try{
   await page.waitForTimeout(1500);
   const audio=()=>page.evaluate(()=>window.__audio.map(a=>a.state));
   // Machines without a sound device (CI) never run audio at all: then only the switches are checked.
-  const sound=await page.evaluate(async()=>{const c=new window.__AC();await c.resume().catch(()=>{});await new Promise(r=>setTimeout(r,500));const ok=c.state==='running';await c.close();return ok;});
+  const sound=await page.evaluate(async()=>{try{const c=new window.__AC();await c.resume().catch(()=>{});await new Promise(r=>setTimeout(r,500));const ok=c.state==='running';c.close().catch(()=>{});return ok;}catch{return false;}}).catch(()=>false);
   check('Music starts with Begin',(await audio()).length>0&&(!sound||(await audio()).includes('running')),`${JSON.stringify(await audio())}${sound?'':' (no sound device here: not required to run)'}`);
   await page.keyboard.press('KeyN');await page.waitForTimeout(600);
   check('N turns the music off',!(await audio()).includes('running')&&!await page.locator('#music-on').isChecked(),JSON.stringify(await audio()));
@@ -289,12 +290,13 @@ try{
   check('Phone: plays without errors',!errs.length,errs[0]??'');
   await ctx.close();
  }
-}finally{
+}catch(e){crashed=e;throw e;}finally{
  const bad=results.filter(r=>!r.ok);
+ if(crashed)console.log(`CRASHED after ${results.length} checks: ${crashed.message.split('\n')[0]}`);
  console.log(`\n${results.length-bad.length}/${results.length} checks passed`);
  for(const r of bad)r.events=await r.events;
  if(bad.length)console.log('FAILED:\n'+bad.map(r=>`  ${r.name} ${r.detail}${r.events?.length?`\n    events: ${r.events.join(' | ')}`:''}`).join('\n'));
- else if(results.length)console.log(`PASS (${NAME}): everything a player touches works: graphics levels, title, help and spell list, music, movement, gathering, casting, panels, tabs, tooltips, map, broom, pause, falling, resizing, beacon, quit and continue, new game, speed test, name plates, smooth motion, phone screen.`);
- process.exitCode=bad.length||!results.length?1:0;
+ else if(results.length&&!crashed)console.log(`PASS (${NAME}, ${Math.round(process.uptime())} s): everything a player touches works: graphics levels, title, help and spell list, music, movement, gathering, casting, panels, tabs, tooltips, map, broom, pause, falling, resizing, beacon, quit and continue, new game, speed test, name plates, smooth motion, phone screen.`);
+ process.exitCode=bad.length||!results.length||crashed?1:0;
  await browser.close();server.close();
 }

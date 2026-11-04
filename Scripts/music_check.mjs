@@ -52,4 +52,4 @@ try{
  if(errors.length)failures.push(...errors.map(e=>`browser error: ${e}`));
 }finally{await browser.close();server.close();}
 if(failures.length){console.log('FAILED:\n'+failures.map(f=>'  ✗ '+f).join('\n'));process.exitCode=1;}
-else console.log(`PASS (${NAME}): the music plays in every mood, audible, never silent, never clipping.`);
+else console.log(`PASS (${NAME}, ${Math.round(process.uptime())} s): the music plays in every mood, audible, never silent, never clipping.`);

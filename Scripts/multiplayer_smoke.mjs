@@ -87,5 +87,5 @@ try{
  await b.waitForFunction(ids=>ids.some(id=>__coven.creatures.some(c=>c.id===id&&!c.remote)),owned).catch(async e=>{
   console.log('handed over?',owned,await b.evaluate(()=>__coven.creatures.filter(c=>c.village===undefined).map(c=>[c.id,c.kind,c.remote?'remote':'ours',Math.round(c.hp)])));throw e;});
  assert.deepEqual(errors,[],'No browser errors');
- console.log(`PASS (${NAME}): two browsers share a world: presence, real coven count, coven rite, shared harvesting, shared villages, chat, shared creatures with kill credit, cross-player bites, creature handover on leave.`);
+ console.log(`PASS (${NAME}, ${Math.round(process.uptime())} s): two browsers share a world: presence, real coven count, coven rite, shared harvesting, shared villages, chat, shared creatures with kill credit, cross-player bites, creature handover on leave.`);
 }finally{await browser?.close();server.kill();}

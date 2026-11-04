@@ -26,7 +26,8 @@ export class Music {
     if (this.ctx || !this.enabled) { this.ctx?.resume?.()?.catch?.(() => {}); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
-    this.build(new AC());
+    // A computer that can't open its sound (no audio device) plays on in silence.
+    try { this.build(new AC()); } catch { this.ctx = null; return; }
     this.timer = setInterval(() => this.schedule(), 100);
   }
   // `seconds` of one mood at `volume` (0–1), rendered offline: an AudioBuffer of stereo samples.

@@ -78,7 +78,7 @@ try{
  await host.close();
  await guest.waitForFunction(()=>__coven.net.status==='offline'&&/closed the game/.test(document.querySelector('#toast').textContent),null,poll);
  assert.deepEqual(errors,[],'No browser errors');
- console.log(`PASS (${NAME}): player-hosted game: four-letter code, join by code, presence, coven count, shared creatures, chat, harvests, wrong code reported, host leaving handled.`);
+ console.log(`PASS (${NAME}, ${Math.round(process.uptime())} s): player-hosted game: four-letter code, join by code, presence, coven count, shared creatures, chat, harvests, wrong code reported, host leaving handled.`);
 }finally{
  await browser?.close();
  // Drop lingering keep-alive and broker sockets so the servers close and the process exits.
