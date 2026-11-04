@@ -160,7 +160,11 @@ try{
  await page.keyboard.press('Escape');
  await page.locator('#quit').waitFor({state:'visible'});
  const kills=await page.evaluate(()=>__coven.state.player.stats.kills);
- await Promise.all([page.waitForNavigation(),page.click('#quit')]);
+ // The menu must have the mouse (a capture granted just after pausing is let go again).
+ await until(()=>!document.pointerLockElement).catch(()=>{});
+ const reloaded=page.waitForNavigation();
+ await page.click('#quit');
+ await reloaded.catch(async e=>{console.log(`Quit did not reload: ${JSON.stringify(await page.evaluate(()=>({mode:__coven.mode,quit:!!document.querySelector('#quit:not(.hidden)'),mouseHeld:!!document.pointerLockElement})).catch(()=>({})))}`);throw e;});
  await until(()=>!!window.__coven);
  assert.equal(await page.evaluate(()=>__coven.mode),'menu','Quit returns to the title screen');
  assert.equal(await page.evaluate(()=>__coven.state.player.stats.kills),kills,'Quit saved the game');

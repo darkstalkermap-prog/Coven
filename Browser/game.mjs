@@ -1031,7 +1031,9 @@ addEventListener('beforeunload', saveState);
 // A host closing the tab ends the game for everyone at once, rather than leaving guests waiting.
 addEventListener('pagehide', () => { if (net.mode === 'host') net.close(); });
 document.addEventListener('pointerlockchange', () => {
-  if (document.pointerLockElement === canvas) return;
+  // Granted a moment after asking: if she has left play meanwhile (Esc straight after Resume), let the mouse go
+  // again, or it would stay caught on the menu and no button could be clicked.
+  if (document.pointerLockElement === canvas) { if (mode !== 'playing') releaseMouse(); return; }
   if (releasing) { releasing = false; return; } // our own release, for a panel or the menu
   if (mode === 'playing') pause();
 });

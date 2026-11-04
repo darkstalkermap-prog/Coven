@@ -22,7 +22,8 @@ export function launch({ chromiumArgs = [] } = {}) {
   if (BROWSER === 'firefox') return firefox.launch({ headless, firefoxUserPrefs: {
     'webgl.force-enabled': true, // WebGL without a graphics card
     'media.autoplay.default': 0, 'media.autoplay.blocking_policy': 0, // let the music start in tests
-    'media.peerconnection.ice.loopback': true, 'media.peerconnection.ice.no_host': false, // player-hosted games on one machine
+    // Player-hosted games on one machine with no STUN server: connect over the machine's own addresses, unmasked.
+    'media.peerconnection.ice.loopback': true, 'media.peerconnection.ice.no_host': false, 'media.peerconnection.ice.obfuscate_host_addresses': false,
   } });
   return webkit.launch({ headless });
 }
