@@ -17,8 +17,11 @@ const url=`http://127.0.0.1:${server.address().port}/`;
 const browser=await launch({chromiumArgs:['--autoplay-policy=no-user-gesture-required']});
 const results=[];
 // A failed check also records the page's recent focus and mouse-lock events and modes, to show why.
-let current=null;
-const check=(name,ok,detail='')=>{const r={name,ok:!!ok,detail};results.push(r);console.log(`${ok?'✓':'✗'} ${name}${detail?` — ${detail}`:''}`);
+let current=null,stuck;
+// A page that stops answering would hang the run: after 10 minutes without a check, say where and stop.
+const watch=()=>{clearTimeout(stuck);stuck=setTimeout(()=>{console.log(`STUCK: no check finished for 10 minutes; the last was "${results.at(-1)?.name??'none'}"`);process.exit(1);},600000);stuck.unref();};
+watch();
+const check=(name,ok,detail='')=>{watch();const r={name,ok:!!ok,detail};results.push(r);console.log(`${ok?'✓':'✗'} ${name}${detail?` — ${detail}`:''}`);
  if(!ok&&current)r.events=current.evaluate(()=>window.__events?.slice(-8)??[]).catch(()=>[]);};
 async function open(quality,{viewport={width:1280,height:800},music=false,keep,phone=false}={}){
  const ctx=keep??await browser.newContext({viewport,...(phone&&CAN_EMULATE_PHONE?{isMobile:true,hasTouch:true}:{})});
@@ -31,7 +34,7 @@ async function open(quality,{viewport={width:1280,height:800},music=false,keep,p
   document.addEventListener('pointerlockchange',()=>log('pointerlockchange'));document.addEventListener('pointerlockerror',()=>log('pointerlockerror'));
   addEventListener('blur',()=>log('blur'));addEventListener('focus',()=>log('focus'));document.addEventListener('visibilitychange',()=>log(`visibility ${document.visibilityState}`));
   addEventListener('keydown',e=>{if(['Escape','Tab','KeyM','KeyH'].includes(e.code))log(`key ${e.code}`);},true);
-  const AC=window.__AC=window.AudioContext;window.__audio=[];window.AudioContext=class extends AC{constructor(...a){super(...a);window.__audio.push(this);}};},[quality,music]);
+  const AC=window.AudioContext;window.__audio=[];window.AudioContext=class extends AC{constructor(...a){super(...a);window.__audio.push(this);}};},[quality,music]);
  await page.goto(url);await page.waitForFunction(()=>!!window.__coven);
  current=page;
  return {page,errs,ctx};
@@ -88,9 +91,10 @@ try{
   // Music: started by the click, toggled by N.
   await page.waitForTimeout(1500);
   const audio=()=>page.evaluate(()=>window.__audio.map(a=>a.state));
-  // Machines without a sound device (CI) never run audio at all: then only the switches are checked.
-  const sound=await page.evaluate(async()=>{try{const c=new window.__AC();await c.resume().catch(()=>{});await new Promise(r=>setTimeout(r,500));const ok=c.state==='running';c.close().catch(()=>{});return ok;}catch{return false;}}).catch(()=>false);
-  check('Music starts with Begin',(await audio()).length>0&&(!sound||(await audio()).includes('running')),`${JSON.stringify(await audio())}${sound?'':' (no sound device here: not required to run)'}`);
+  // The game's own sound: running where the machine has a sound device; held suspended where it has none (CI),
+  // and then only the switches are checked. (No second audio context is opened: Firefox without a device can hang.)
+  const started=await audio(),sound=started.includes('running');
+  check('Music starts with Begin',started.length>0&&started.every(st=>st==='running'||st==='suspended'),`${JSON.stringify(started)}${sound?'':' (no sound device here: not required to run)'}`);
   await page.keyboard.press('KeyN');await page.waitForTimeout(600);
   check('N turns the music off',!(await audio()).includes('running')&&!await page.locator('#music-on').isChecked(),JSON.stringify(await audio()));
   await page.keyboard.press('KeyN');await page.waitForTimeout(600);
